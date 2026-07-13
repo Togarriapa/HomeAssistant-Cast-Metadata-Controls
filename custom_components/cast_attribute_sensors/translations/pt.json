@@ -1,0 +1,14 @@
+{
+  "title": "Metadados Cast e Controlos de TV",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar Metadados Cast e Controlos de TV",
+        "description": "Cria sensores de metadados Cast apenas quando os valores aparecem pela primeira vez, mantém-nos permanentemente e adiciona controlos Cast e de TV de acordo com as capacidades disponíveis, incluindo seleção de aplicações e entradas."
+      }
+    },
+    "abort": {
+      "already_configured": "Os Metadados Cast e Controlos de TV já estão configurados."
+    }
+  }
+}

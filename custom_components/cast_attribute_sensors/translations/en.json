@@ -1,0 +1,14 @@
+{
+  "title": "Cast Metadata & TV Controls",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Cast Metadata & TV Controls",
+        "description": "Create Cast metadata sensors only after values first appear, retain them permanently, and add capability-aware Cast and native TV controls including app and input selection."
+      }
+    },
+    "abort": {
+      "already_configured": "Cast Metadata & TV Controls is already configured."
+    }
+  }
+}

@@ -1,0 +1,62 @@
+launch_app:
+  name: Launch Cast app
+  description: Launch an arbitrary Google Cast receiver application by its Cast app ID.
+  fields:
+    entity_id:
+      name: Cast device
+      description: One or more media players provided by Home Assistant's native Google Cast integration.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: cast
+          multiple: true
+    app_id:
+      name: Cast app ID
+      description: Google Cast receiver application ID, for example 233637DE for YouTube.
+      required: true
+      example: 233637DE
+      selector:
+        text:
+
+launch_tv_app:
+  name: Launch TV app
+  description: Launch an installed Android or Google TV application by package ID through Android TV Remote.
+  fields:
+    entity_id:
+      name: TV
+      description: One or more Android TV Remote media-player entities.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: androidtv_remote
+          multiple: true
+    app_id:
+      name: Package ID
+      description: Android application package ID, for example com.google.android.youtube.tv.
+      required: true
+      example: com.google.android.youtube.tv
+      selector:
+        text:
+
+send_tv_command:
+  name: Send TV command
+  description: Send a key command through the companion Android TV Remote entity.
+  fields:
+    entity_id:
+      name: TV
+      description: One or more Android TV Remote media-player entities.
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: androidtv_remote
+          multiple: true
+    command:
+      name: Command
+      description: Android TV key command such as HOME, BACK, SETTINGS, DPAD_CENTER, CHANNEL_UP, or MEDIA_PLAY_PAUSE.
+      required: true
+      example: HOME
+      selector:
+        text:
