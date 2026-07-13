@@ -17,7 +17,9 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
+          # Repository description, topics, and brand assets are optional for this
+          # personal HACS repository. All installation and structure checks remain active.
+          ignore: brands description topics
 
   lint-and-test:
     runs-on: ubuntu-latest
