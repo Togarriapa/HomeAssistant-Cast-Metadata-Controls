@@ -2,6 +2,7 @@
   "domain": "cast_attribute_sensors",
   "name": "Cast Metadata & TV Controls",
   "after_dependencies": [
+    "androidtv",
     "androidtv_remote",
     "cast"
   ],
@@ -14,6 +15,6 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls/issues",
   "requirements": [],
-  "version": "3.0.0",
+  "version": "4.0.0",
   "single_config_entry": true
 }
