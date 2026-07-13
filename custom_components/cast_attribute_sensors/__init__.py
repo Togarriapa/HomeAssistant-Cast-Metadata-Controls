@@ -220,13 +220,20 @@ async def async_unload_entry(
 async def async_migrate_entry(
     hass: HomeAssistant, config_entry: config_entries.ConfigEntry
 ) -> bool:
-    """Migrate to compact controller devices and remove legacy helper clutter."""
+    """Remove obsolete generated entities before rebuilding consolidated controllers."""
+    registry = er.async_get(hass)
+    entries = list(er.async_entries_for_config_entry(registry, config_entry.entry_id))
+
     if config_entry.version < 4:
-        registry = er.async_get(hass)
-        for registry_entry in list(
-            er.async_entries_for_config_entry(registry, config_entry.entry_id)
-        ):
+        for registry_entry in entries:
             if registry_entry.domain in {"button", "number", "select", "switch"}:
                 registry.async_remove(registry_entry.entity_id)
-        hass.config_entries.async_update_entry(config_entry, version=4)
+
+    if config_entry.version < 5:
+        for registry_entry in entries:
+            if registry_entry.domain == "media_player":
+                registry.async_remove(registry_entry.entity_id)
+
+    if config_entry.version < 5:
+        hass.config_entries.async_update_entry(config_entry, version=5)
     return True
