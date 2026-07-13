@@ -1,14 +1,13 @@
-launch_app:
+launch_cast_app:
   name: Launch Cast app
-  description: Launch an arbitrary Google Cast receiver application by Cast app ID.
+  description: Launch a Google Cast receiver application by Cast app ID.
   fields:
     entity_id:
-      name: Cast device
+      name: Controller or Cast source
       required: true
       selector:
         entity:
           domain: media_player
-          integration: cast
           multiple: true
     app_id:
       name: Cast app ID
@@ -22,7 +21,7 @@ launch_tv_app:
   description: Launch an Android or Google TV application by package ID.
   fields:
     entity_id:
-      name: TV
+      name: Controller or Android TV Remote source
       required: true
       selector:
         entity:
@@ -37,14 +36,15 @@ launch_tv_app:
 
 register_tv_app:
   name: Register TV app
-  description: Permanently add an app to this integration's TV app catalogue.
+  description: Permanently add an Android TV package to a controller's app catalogue.
   fields:
     entity_id:
-      name: TV
+      name: Controller
       required: true
       selector:
         entity:
           domain: media_player
+          integration: cast_attribute_sensors
           multiple: true
     app_id:
       name: Package ID
@@ -55,20 +55,21 @@ register_tv_app:
     app_name:
       name: Display name
       required: true
-      example: My TV App
+      example: Example TV App
       selector:
         text:
 
-send_tv_command:
-  name: Send TV command
-  description: Send a key command through a companion Android TV Remote entity.
+send_command:
+  name: Send remote command
+  description: Send a key command through the linked Android TV Remote entity.
   fields:
     entity_id:
-      name: TV
+      name: Controller
       required: true
       selector:
         entity:
           domain: media_player
+          integration: cast_attribute_sensors
           multiple: true
     command:
       name: Command
@@ -79,15 +80,15 @@ send_tv_command:
 
 seek_relative:
   name: Seek relative
-  description: Seek forward or backward from the corrected live Cast position.
+  description: Seek from the corrected live playback position.
   fields:
     entity_id:
-      name: Cast device
+      name: Controller
       required: true
       selector:
         entity:
           domain: media_player
-          integration: cast
+          integration: cast_attribute_sensors
           multiple: true
     seconds:
       name: Seconds
@@ -99,3 +100,16 @@ seek_relative:
           min: -3600
           max: 3600
           mode: box
+
+restart_device:
+  name: Restart device
+  description: Use a native restart button when available, otherwise perform a controlled power or receiver reset.
+  fields:
+    entity_id:
+      name: Controller
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: cast_attribute_sensors
+          multiple: true
