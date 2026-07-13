@@ -25,6 +25,19 @@ from .tv_platform import setup_tv_entities
 
 APP_PREFIX = "App · "
 INPUT_PREFIX = "Input · "
+PROXIED_FEATURES = (
+    MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.SEEK
+    | MediaPlayerEntityFeature.VOLUME_SET
+    | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    | MediaPlayerEntityFeature.NEXT_TRACK
+    | MediaPlayerEntityFeature.TURN_ON
+    | MediaPlayerEntityFeature.TURN_OFF
+    | MediaPlayerEntityFeature.VOLUME_STEP
+    | MediaPlayerEntityFeature.STOP
+    | MediaPlayerEntityFeature.PLAY
+)
 
 
 async def async_setup_entry(
@@ -64,7 +77,8 @@ def _media_state(value: str | None) -> MediaPlayerState | None:
 
 def _supported_features(state) -> MediaPlayerEntityFeature:
     value = state.attributes.get("supported_features", 0) if state else 0
-    return MediaPlayerEntityFeature(value if isinstance(value, int) else 0)
+    native = MediaPlayerEntityFeature(value if isinstance(value, int) else 0)
+    return native & PROXIED_FEATURES
 
 
 def _live_position(state) -> float | None:
