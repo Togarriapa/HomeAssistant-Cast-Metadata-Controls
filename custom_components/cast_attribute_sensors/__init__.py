@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -13,9 +14,11 @@ from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
+from .app_learning import async_setup_dynamic_app_learning
 from .const import (
     ATTR_APP_ID,
     ATTR_APP_NAME,
@@ -67,6 +70,29 @@ def _current_position(state) -> float | None:
     return max(0.0, result)
 
 
+async def _async_cleanup_orphan_controller_devices(
+    hass: HomeAssistant, entry: CastAttributeConfigEntry
+) -> None:
+    """Remove obsolete empty virtual devices left by older layouts."""
+    await asyncio.sleep(5)
+    entity_registry = er.async_get(hass)
+    device_registry = dr.async_get(hass)
+    used_device_ids = {
+        registry_entry.device_id
+        for registry_entry in er.async_entries_for_config_entry(
+            entity_registry, entry.entry_id
+        )
+        if registry_entry.device_id is not None
+    }
+    for device in list(device_registry.devices.values()):
+        if entry.entry_id not in device.config_entries:
+            continue
+        if not any(identifier[0] == DOMAIN for identifier in device.identifiers):
+            continue
+        if device.id not in used_device_ids:
+            device_registry.async_remove_device(device.id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: CastAttributeConfigEntry
 ) -> bool:
@@ -76,6 +102,9 @@ async def async_setup_entry(
     await manager.async_initialize()
     await tv_manager.async_initialize()
     entry.runtime_data = CastAttributeRuntimeData(manager=manager, tv_manager=tv_manager)
+    entry.async_on_unload(
+        async_setup_dynamic_app_learning(hass, manager, tv_manager)
+    )
 
     async def async_handle_launch_app(call: ServiceCall) -> None:
         app_id: str = call.data[ATTR_APP_ID]
@@ -194,6 +223,10 @@ async def async_setup_entry(
     )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    hass.async_create_task(
+        _async_cleanup_orphan_controller_devices(hass, entry),
+        f"{DOMAIN}-cleanup-orphan-devices",
+    )
     return True
 
 
@@ -220,7 +253,7 @@ async def async_unload_entry(
 async def async_migrate_entry(
     hass: HomeAssistant, config_entry: config_entries.ConfigEntry
 ) -> bool:
-    """Remove obsolete generated entities before rebuilding consolidated controllers."""
+    """Rebuild controllers while preserving learned apps and metadata sensors."""
     registry = er.async_get(hass)
     entries = list(er.async_entries_for_config_entry(registry, config_entry.entry_id))
 
@@ -229,11 +262,10 @@ async def async_migrate_entry(
             if registry_entry.domain in {"button", "number", "select", "switch"}:
                 registry.async_remove(registry_entry.entity_id)
 
-    if config_entry.version < 5:
+    if config_entry.version < 6:
         for registry_entry in entries:
             if registry_entry.domain == "media_player":
                 registry.async_remove(registry_entry.entity_id)
+        hass.config_entries.async_update_entry(config_entry, version=6)
 
-    if config_entry.version < 5:
-        hass.config_entries.async_update_entry(config_entry, version=5)
     return True
