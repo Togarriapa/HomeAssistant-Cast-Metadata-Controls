@@ -3,12 +3,49 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configurar Metadados Cast e Controlos de TV",
-        "description": "Cria sensores de metadados Cast apenas quando os valores aparecem pela primeira vez, mantém-nos permanentemente e adiciona controlos Cast e de TV de acordo com as capacidades disponíveis, incluindo seleção de aplicações e entradas."
+        "title": "Metadados Cast e Controlos de TV",
+        "description": "Cria um único dispositivo de controlo organizado para cada TV física, Chromecast, coluna Cast ou ecrã inteligente."
       }
     },
     "abort": {
-      "already_configured": "Os Metadados Cast e Controlos de TV já estão configurados."
+      "already_configured": "A integração já está configurada."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Agrupamento de dispositivos físicos",
+        "description": "O agrupamento automático utiliza IDs de dispositivo, ligações de rede, áreas e nomes. Crie um grupo explícito apenas quando o Home Assistant representar a mesma TV física como vários dispositivos.",
+        "menu_options": {
+          "add_group": "Combinar entidades de origem",
+          "remove_group": "Remover um grupo explícito",
+          "clear_groups": "Limpar todos os grupos explícitos"
+        }
+      },
+      "add_group": {
+        "title": "Combinar entidades de origem",
+        "description": "Selecione todas as entidades media_player nativas que representam a mesma televisão física.",
+        "data": {
+          "name": "Nome do dispositivo",
+          "entities": "Entidades de origem"
+        }
+      },
+      "remove_group": {
+        "title": "Remover um grupo explícito",
+        "data": {
+          "group_id": "Grupo"
+        }
+      },
+      "clear_groups": {
+        "title": "Limpar todos os grupos explícitos",
+        "description": "O agrupamento automático será utilizado depois de a integração recarregar.",
+        "data": {
+          "confirm": "Confirmar"
+        }
+      }
+    },
+    "error": {
+      "two_entities_required": "Selecione pelo menos duas entidades de origem diferentes."
     }
   }
 }
