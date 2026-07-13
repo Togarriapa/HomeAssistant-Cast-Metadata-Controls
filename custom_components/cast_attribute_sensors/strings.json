@@ -3,12 +3,49 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up Cast Metadata & TV Controls",
-        "description": "Create Cast metadata sensors only after values first appear, retain them permanently, and add capability-aware Cast and native TV controls including app and input selection."
+        "title": "Cast Metadata & TV Controls",
+        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display."
       }
     },
     "abort": {
       "already_configured": "Cast Metadata & TV Controls is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Physical device grouping",
+        "description": "Automatic grouping uses device IDs, network connections, areas, and names. Add an explicit group only when Home Assistant represents one physical TV as multiple devices.",
+        "menu_options": {
+          "add_group": "Combine source entities",
+          "remove_group": "Remove an explicit group",
+          "clear_groups": "Clear all explicit groups"
+        }
+      },
+      "add_group": {
+        "title": "Combine source entities",
+        "description": "Select every native media_player entity that represents the same physical television.",
+        "data": {
+          "name": "Device name",
+          "entities": "Source entities"
+        }
+      },
+      "remove_group": {
+        "title": "Remove an explicit group",
+        "data": {
+          "group_id": "Group"
+        }
+      },
+      "clear_groups": {
+        "title": "Clear all explicit groups",
+        "description": "Automatic grouping will be used after the integration reloads.",
+        "data": {
+          "confirm": "Confirm"
+        }
+      }
+    },
+    "error": {
+      "two_entities_required": "Select at least two different source entities."
     }
   }
 }
