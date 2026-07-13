@@ -1,49 +1,49 @@
 # Changelog
 
+## 7.0.0
+
+- Rebuilt the integration around one unified source manager and one physical-device resolver.
+- Added one controller device per independent physical TV, Chromecast, Cast speaker, or smart display.
+- Added explicit physical-device grouping through the integration Configure menu for cases automatic matching cannot resolve safely.
+- Preserved existing v2 metadata sensor unique IDs while moving sensors onto the correct consolidated device.
+- Added automatic lazy sensors for every non-null Cast and TV state attribute.
+- Disabled complete attribute snapshots by default while keeping them available as diagnostic entities.
+- Removed all generated button, select, number, and switch clutter.
+- Added robust native-app, Cast-app, and physical-input routing through one source selector.
+- Added a retry path when leaving a Cast session and launching a native Android/Google TV app.
+- Filtered Ready-to-Cast and receiver pseudo-apps from the native app list.
+- Corrected relative seeking using the elapsed time since `media_position_updated_at`.
+- Added repeat and shuffle proxy support.
+- Added controller actions for remote commands, relative seeking, app launching, app registration, and restart.
+- Added a one-time v7 migration and delayed orphan-device cleanup.
+- Added migration of learned apps from both legacy storage files.
+- Added integration-local Home Assistant/HACS brand assets and updated README artwork.
+- Consolidated validation into HACS, hassfest, Ruff, compilation, JSON/YAML validation, and unit tests.
+- Standardized the release workflow and repository documentation.
+
 ## 6.0.0
 
-- Added automatic versioned GitHub releases so HACS installs the current code instead of remaining on the last recognized release.
-- Rebuilt controller entities during migration to eliminate layouts retained from versions 3–5.
-- Consolidated Android TV Remote, Android TV ADB, Google Cast, and manufacturer entities into one controller per matched physical television.
-- Kept standalone Chromecast dongles, Cast speakers, and displays as independent devices.
-- Grouped every dynamically discovered Cast and TV sensor under the matching integration-owned physical device.
-- Added runtime app learning: newly observed TV and Cast apps are added to the controller immediately and persisted across restarts.
-- Separated source options into `TV App ·`, `Cast ·`, and `Input ·` mechanisms.
-- Filtered transient Ready-to-Cast receiver states from native TV application options.
-- Improved switching from Cast sessions back to native TV apps and physical inputs.
-- Added local HACS icon/logo assets and README banner artwork.
-- Re-enabled HACS brand validation.
-- Added cleanup of obsolete empty virtual controller devices.
+- Added versioned GitHub releases and v6 controller migration.
+- Consolidated matched TV, ADB, Remote, and Cast entities.
+- Added runtime app learning and local brand assets.
 
 ## 5.0.0
 
-- Added physical-device matching through Home Assistant device IDs, network connections, areas, and normalized names.
-- Moved metadata from matching Cast and TV representations onto the same virtual controller device.
-- Reclassified the integration from a helper to a hub integration.
+- Added device matching using registry IDs, network connections, areas, and normalized names.
+- Reclassified the integration as a hub.
 
 ## 4.0.0
 
-- Replaced the large standalone control-entity set with compact `media_player` controllers.
-- Added integration-owned controller devices.
-- Removed generated button, number, select, and switch clutter during migration.
-- Corrected relative seeking by calculating the live playback position from `media_position_updated_at`.
-- Added `cast_attribute_sensors.seek_relative`.
-- Expanded the built-in Android/Google TV application catalogue.
-- Added configured, learned, and Android TV ADB application sources.
-- Added `cast_attribute_sensors.register_tv_app`.
+- Replaced standalone control helpers with compact media-player controllers.
+- Corrected stale-position relative seeking.
 
 ## 3.0.0
 
-- Added native TV discovery alongside Google Cast discovery.
-- Added TV power, input, application, volume, mute, playback, navigation, and restart controls.
-- Added Android/Google TV app launching and Android TV Remote commands.
-- Added Cast receiver soft restart, relative seeking, media-position slider, shuffle, and repeat controls.
+- Added native TV controls and Android TV Remote support.
 
 ## 2.0.0
 
-- Changed attribute sensors to lazy creation after a non-null value first appears.
-- Retained observed metadata sensors permanently through the entity registry.
-- Added learned Cast app selection and arbitrary Cast app launching.
+- Added lazy metadata sensors and learned Cast apps.
 
 ## 1.0.0
 

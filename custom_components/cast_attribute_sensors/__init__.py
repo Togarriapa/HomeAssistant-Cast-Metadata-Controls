@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime
+from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.components.media_player import MediaPlayerState
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -16,73 +14,52 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt as dt_util
 
-from .app_learning import async_setup_dynamic_app_learning
 from .const import (
+    ANDROID_TV_REMOTE_DOMAIN,
     ATTR_APP_ID,
     ATTR_APP_NAME,
     ATTR_COMMAND,
     ATTR_SECONDS,
     DOMAIN,
-    SERVICE_LAUNCH_APP,
+    SERVICE_LAUNCH_CAST_APP,
     SERVICE_LAUNCH_TV_APP,
     SERVICE_REGISTER_TV_APP,
+    SERVICE_RESTART_DEVICE,
     SERVICE_SEEK_RELATIVE,
-    SERVICE_SEND_TV_COMMAND,
+    SERVICE_SEND_COMMAND,
 )
-from .manager import CastManager
-from .tv_manager import TvManager
+from .runtime import IntegrationRuntime
+from .source_manager import SourceManager
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.MEDIA_PLAYER]
-
-
-@dataclass(slots=True)
-class CastAttributeRuntimeData:
-    """Runtime data for Cast Metadata & TV Controls."""
-
-    manager: CastManager
-    tv_manager: TvManager
+PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.SENSOR]
 
 
-type CastAttributeConfigEntry = ConfigEntry[CastAttributeRuntimeData]
+def _entity_ids(call: ServiceCall) -> list[str]:
+    value = call.data[ATTR_ENTITY_ID]
+    return [value] if isinstance(value, str) else list(value)
 
 
-def _current_position(state) -> float | None:
-    """Calculate a live position instead of using a stale Cast position."""
-    if state is None:
-        return None
-    position = state.attributes.get("media_position")
-    if not isinstance(position, (int, float)):
-        return None
-    result = float(position)
-    updated_at = state.attributes.get("media_position_updated_at")
-    parsed: datetime | None = None
-    if isinstance(updated_at, datetime):
-        parsed = updated_at
-    elif isinstance(updated_at, str):
-        parsed = dt_util.parse_datetime(updated_at)
-    if state.state == MediaPlayerState.PLAYING and parsed is not None:
-        result += max(0.0, (dt_util.utcnow() - parsed).total_seconds())
-    duration = state.attributes.get("media_duration")
-    if isinstance(duration, (int, float)) and duration > 0:
-        result = min(result, float(duration))
-    return max(0.0, result)
+def _controller(runtime: IntegrationRuntime, entity_id: str):
+    controller = runtime.controllers.get(entity_id)
+    if controller is None:
+        raise ServiceValidationError(
+            f"{entity_id} is not a Cast Metadata & TV Controls controller"
+        )
+    return controller
 
 
-async def _async_cleanup_orphan_controller_devices(
-    hass: HomeAssistant, entry: CastAttributeConfigEntry
+async def _async_cleanup_orphan_devices(
+    hass: HomeAssistant, entry: ConfigEntry
 ) -> None:
-    """Remove obsolete empty virtual devices left by older layouts."""
+    """Remove empty virtual devices retained by older entity layouts."""
     await asyncio.sleep(5)
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
     used_device_ids = {
-        registry_entry.device_id
-        for registry_entry in er.async_entries_for_config_entry(
-            entity_registry, entry.entry_id
-        )
-        if registry_entry.device_id is not None
+        entity.device_id
+        for entity in er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+        if entity.device_id is not None
     }
     for device in list(device_registry.devices.values()):
         if entry.entry_id not in device.config_entries:
@@ -93,107 +70,118 @@ async def _async_cleanup_orphan_controller_devices(
             device_registry.async_remove_device(device.id)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant, entry: CastAttributeConfigEntry
-) -> bool:
-    """Set up Cast Metadata & TV Controls from a config entry."""
-    manager = CastManager(hass)
-    tv_manager = TvManager(hass)
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up the single integration hub."""
+    manager = SourceManager(hass)
     await manager.async_initialize()
-    await tv_manager.async_initialize()
-    entry.runtime_data = CastAttributeRuntimeData(manager=manager, tv_manager=tv_manager)
-    entry.async_on_unload(
-        async_setup_dynamic_app_learning(hass, manager, tv_manager)
-    )
+    runtime = IntegrationRuntime(hass=hass, entry=entry, manager=manager)
+    runtime.refresh_groups()
+    runtime.start_topology_watch()
+    entry.runtime_data = runtime
 
-    async def async_handle_launch_app(call: ServiceCall) -> None:
-        app_id: str = call.data[ATTR_APP_ID]
-        for entity_id in call.data[ATTR_ENTITY_ID]:
-            source_id = manager.get_source_id_for_entity_id(entity_id)
-            if source_id is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not a native Cast media_player"
+    async def launch_cast_app(call: ServiceCall) -> None:
+        app_id = call.data[ATTR_APP_ID].strip()
+        for entity_id in _entity_ids(call):
+            if entity_id in runtime.controllers:
+                controller = _controller(runtime, entity_id)
+                source_id = next(
+                    (
+                        source_id
+                        for source_id in controller.group.source_ids
+                        if (source := manager.get_source(source_id)) is not None
+                        and source.is_cast
+                    ),
+                    None,
                 )
-            await manager.async_launch_app(source_id, app_id)
+            else:
+                source_id = manager.source_id_for_entity(entity_id)
+            source = manager.get_source(source_id) if source_id is not None else None
+            if source is None or not source.is_cast:
+                raise ServiceValidationError(f"{entity_id} has no Cast receiver")
+            await manager.launch_cast_app(source_id, app_id)
 
-    async def async_handle_launch_tv_app(call: ServiceCall) -> None:
-        app_id: str = call.data[ATTR_APP_ID]
-        for entity_id in call.data[ATTR_ENTITY_ID]:
-            source_id = tv_manager.get_source_id_for_entity_id(entity_id)
-            if source_id is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not a tracked native TV media_player"
+    async def launch_tv_app(call: ServiceCall) -> None:
+        app_id = call.data[ATTR_APP_ID].strip()
+        for entity_id in _entity_ids(call):
+            if entity_id in runtime.controllers:
+                controller = _controller(runtime, entity_id)
+                source_id = next(
+                    (
+                        source_id
+                        for source_id in controller.group.source_ids
+                        if manager.platform(source_id) == ANDROID_TV_REMOTE_DOMAIN
+                    ),
+                    None,
                 )
-            await tv_manager.async_launch_app(source_id, app_id)
+            else:
+                source_id = manager.source_id_for_entity(entity_id)
+            if (
+                source_id is None
+                or manager.platform(source_id) != ANDROID_TV_REMOTE_DOMAIN
+            ):
+                raise ServiceValidationError(
+                    f"{entity_id} has no Android TV Remote media player"
+                )
+            await manager.launch_tv_app(source_id, app_id)
 
-    async def async_handle_register_tv_app(call: ServiceCall) -> None:
+    async def register_tv_app(call: ServiceCall) -> None:
         app_id = call.data[ATTR_APP_ID].strip()
         app_name = call.data[ATTR_APP_NAME].strip()
-        for entity_id in call.data[ATTR_ENTITY_ID]:
-            source_id = tv_manager.get_source_id_for_entity_id(entity_id)
-            if source_id is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not a tracked native TV media_player"
-                )
-            tv_manager._learned_apps.setdefault(source_id, {})[app_id] = app_name
-            tv_manager._async_schedule_save()
-            state = tv_manager.get_source_state(source_id)
-            tv_manager._async_notify_source(source_id, state, state)
-
-    async def async_handle_send_tv_command(call: ServiceCall) -> None:
-        command: str = call.data[ATTR_COMMAND]
-        for entity_id in call.data[ATTR_ENTITY_ID]:
-            source_id = tv_manager.get_source_id_for_entity_id(entity_id)
-            if source_id is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not a tracked native TV media_player"
-                )
-            await tv_manager.async_send_remote_command(source_id, command)
-
-    async def async_handle_seek_relative(call: ServiceCall) -> None:
-        seconds = float(call.data[ATTR_SECONDS])
-        for entity_id in call.data[ATTR_ENTITY_ID]:
-            source_id = manager.get_source_id_for_entity_id(entity_id)
-            if source_id is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not a native Cast media_player"
-                )
-            state = manager.get_source_state(source_id)
-            position = _current_position(state)
-            if position is None:
-                raise ServiceValidationError(
-                    f"{entity_id} is not reporting a media position"
-                )
-            target = max(0.0, position + seconds)
-            duration = state.attributes.get("media_duration") if state else None
-            if isinstance(duration, (int, float)) and duration > 0:
-                target = min(target, float(duration))
-            await manager.async_call_media_player(
-                source_id, "media_seek", {"seek_position": target}
+        for entity_id in _entity_ids(call):
+            if entity_id in runtime.controllers:
+                controller = _controller(runtime, entity_id)
+                source_ids = controller.group.source_ids
+            else:
+                source_id = manager.source_id_for_entity(entity_id)
+                source_ids = (source_id,) if source_id else ()
+            remote_id = next(
+                (
+                    source_id
+                    for source_id in source_ids
+                    if manager.platform(source_id) == ANDROID_TV_REMOTE_DOMAIN
+                ),
+                None,
             )
+            if remote_id is None:
+                raise ServiceValidationError(
+                    f"{entity_id} has no Android TV Remote media player"
+                )
+            manager.register_app(remote_id, app_id, app_name)
 
-    entity_and_app_schema = vol.Schema(
+    async def send_command(call: ServiceCall) -> None:
+        command = call.data[ATTR_COMMAND].strip()
+        for entity_id in _entity_ids(call):
+            await _controller(runtime, entity_id).async_send_command(command)
+
+    async def seek_relative(call: ServiceCall) -> None:
+        seconds = float(call.data[ATTR_SECONDS])
+        for entity_id in _entity_ids(call):
+            await _controller(runtime, entity_id).async_seek_relative(seconds)
+
+    async def restart_device(call: ServiceCall) -> None:
+        for entity_id in _entity_ids(call):
+            await _controller(runtime, entity_id).async_restart()
+
+    app_schema = vol.Schema(
         {
             vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
             vol.Required(ATTR_APP_ID): vol.All(cv.string, vol.Length(min=1)),
         }
     )
+    controller_schema: dict[Any, Any] = {vol.Required(ATTR_ENTITY_ID): cv.entity_ids}
     hass.services.async_register(
-        DOMAIN, SERVICE_LAUNCH_APP, async_handle_launch_app, schema=entity_and_app_schema
+        DOMAIN, SERVICE_LAUNCH_CAST_APP, launch_cast_app, schema=app_schema
     )
     hass.services.async_register(
-        DOMAIN,
-        SERVICE_LAUNCH_TV_APP,
-        async_handle_launch_tv_app,
-        schema=entity_and_app_schema,
+        DOMAIN, SERVICE_LAUNCH_TV_APP, launch_tv_app, schema=app_schema
     )
     hass.services.async_register(
         DOMAIN,
         SERVICE_REGISTER_TV_APP,
-        async_handle_register_tv_app,
+        register_tv_app,
         schema=vol.Schema(
             {
-                vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+                **controller_schema,
                 vol.Required(ATTR_APP_ID): vol.All(cv.string, vol.Length(min=1)),
                 vol.Required(ATTR_APP_NAME): vol.All(cv.string, vol.Length(min=1)),
             }
@@ -201,11 +189,11 @@ async def async_setup_entry(
     )
     hass.services.async_register(
         DOMAIN,
-        SERVICE_SEND_TV_COMMAND,
-        async_handle_send_tv_command,
+        SERVICE_SEND_COMMAND,
+        send_command,
         schema=vol.Schema(
             {
-                vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+                **controller_schema,
                 vol.Required(ATTR_COMMAND): vol.All(cv.string, vol.Length(min=1)),
             }
         ),
@@ -213,59 +201,59 @@ async def async_setup_entry(
     hass.services.async_register(
         DOMAIN,
         SERVICE_SEEK_RELATIVE,
-        async_handle_seek_relative,
+        seek_relative,
         schema=vol.Schema(
             {
-                vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
+                **controller_schema,
                 vol.Required(ATTR_SECONDS): vol.Coerce(float),
             }
         ),
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESTART_DEVICE,
+        restart_device,
+        schema=vol.Schema(controller_schema),
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     hass.async_create_task(
-        _async_cleanup_orphan_controller_devices(hass, entry),
-        f"{DOMAIN}-cleanup-orphan-devices",
+        _async_cleanup_orphan_devices(hass, entry), f"{DOMAIN}-orphan-cleanup"
     )
     return True
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, entry: CastAttributeConfigEntry
-) -> bool:
-    """Unload a Cast Metadata & TV Controls config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if not unload_ok:
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload the hub."""
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
     for service in (
-        SERVICE_LAUNCH_APP,
+        SERVICE_LAUNCH_CAST_APP,
         SERVICE_LAUNCH_TV_APP,
         SERVICE_REGISTER_TV_APP,
-        SERVICE_SEND_TV_COMMAND,
+        SERVICE_SEND_COMMAND,
         SERVICE_SEEK_RELATIVE,
+        SERVICE_RESTART_DEVICE,
     ):
         hass.services.async_remove(DOMAIN, service)
     await entry.runtime_data.manager.async_stop()
-    await entry.runtime_data.tv_manager.async_stop()
     return True
 
 
 async def async_migrate_entry(
-    hass: HomeAssistant, config_entry: config_entries.ConfigEntry
+    hass: HomeAssistant, entry: config_entries.ConfigEntry
 ) -> bool:
-    """Rebuild controllers while preserving learned apps and metadata sensors."""
+    """Rebuild controls once while retaining learned apps and v2 metadata sensors."""
     registry = er.async_get(hass)
-    entries = list(er.async_entries_for_config_entry(registry, config_entry.entry_id))
-
-    if config_entry.version < 4:
-        for registry_entry in entries:
-            if registry_entry.domain in {"button", "number", "select", "switch"}:
-                registry.async_remove(registry_entry.entity_id)
-
-    if config_entry.version < 6:
-        for registry_entry in entries:
-            if registry_entry.domain == "media_player":
-                registry.async_remove(registry_entry.entity_id)
-        hass.config_entries.async_update_entry(config_entry, version=6)
-
+    if entry.version < 7:
+        for entity in list(er.async_entries_for_config_entry(registry, entry.entry_id)):
+            if entity.domain in {
+                "button",
+                "media_player",
+                "number",
+                "select",
+                "switch",
+            } or (entity.domain == "sensor" and entity.unique_id.startswith("v1|")):
+                registry.async_remove(entity.entity_id)
+        hass.config_entries.async_update_entry(entry, version=7)
     return True

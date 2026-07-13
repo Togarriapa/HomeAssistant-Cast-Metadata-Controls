@@ -15,6 +15,6 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls/issues",
   "requirements": [],
-  "version": "6.0.0",
-  "single_config_entry": true
+  "single_config_entry": true,
+  "version": "7.0.0"
 }
