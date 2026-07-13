@@ -1,10 +1,9 @@
 launch_app:
   name: Launch Cast app
-  description: Launch an arbitrary Google Cast receiver application by its Cast app ID.
+  description: Launch an arbitrary Google Cast receiver application by Cast app ID.
   fields:
     entity_id:
       name: Cast device
-      description: One or more media players provided by Home Assistant's native Google Cast integration.
       required: true
       selector:
         entity:
@@ -13,7 +12,6 @@ launch_app:
           multiple: true
     app_id:
       name: Cast app ID
-      description: Google Cast receiver application ID, for example 233637DE for YouTube.
       required: true
       example: 233637DE
       selector:
@@ -21,42 +19,83 @@ launch_app:
 
 launch_tv_app:
   name: Launch TV app
-  description: Launch an installed Android or Google TV application by package ID through Android TV Remote.
+  description: Launch an Android or Google TV application by package ID.
   fields:
     entity_id:
       name: TV
-      description: One or more Android TV Remote media-player entities.
       required: true
       selector:
         entity:
           domain: media_player
-          integration: androidtv_remote
           multiple: true
     app_id:
       name: Package ID
-      description: Android application package ID, for example com.google.android.youtube.tv.
       required: true
       example: com.google.android.youtube.tv
       selector:
         text:
 
-send_tv_command:
-  name: Send TV command
-  description: Send a key command through the companion Android TV Remote entity.
+register_tv_app:
+  name: Register TV app
+  description: Permanently add an app to this integration's TV app catalogue.
   fields:
     entity_id:
       name: TV
-      description: One or more Android TV Remote media-player entities.
       required: true
       selector:
         entity:
           domain: media_player
-          integration: androidtv_remote
+          multiple: true
+    app_id:
+      name: Package ID
+      required: true
+      example: com.example.androidtv
+      selector:
+        text:
+    app_name:
+      name: Display name
+      required: true
+      example: My TV App
+      selector:
+        text:
+
+send_tv_command:
+  name: Send TV command
+  description: Send a key command through a companion Android TV Remote entity.
+  fields:
+    entity_id:
+      name: TV
+      required: true
+      selector:
+        entity:
+          domain: media_player
           multiple: true
     command:
       name: Command
-      description: Android TV key command such as HOME, BACK, SETTINGS, DPAD_CENTER, CHANNEL_UP, or MEDIA_PLAY_PAUSE.
       required: true
       example: HOME
       selector:
         text:
+
+seek_relative:
+  name: Seek relative
+  description: Seek forward or backward from the corrected live Cast position.
+  fields:
+    entity_id:
+      name: Cast device
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: cast
+          multiple: true
+    seconds:
+      name: Seconds
+      description: Positive values move forward; negative values rewind.
+      required: true
+      example: 10
+      selector:
+        number:
+          min: -3600
+          max: 3600
+          mode: box
