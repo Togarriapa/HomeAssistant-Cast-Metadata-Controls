@@ -11,10 +11,10 @@
   ],
   "config_flow": true,
   "documentation": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls",
-  "integration_type": "helper",
+  "integration_type": "hub",
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls/issues",
   "requirements": [],
-  "version": "4.0.0",
+  "version": "5.0.0",
   "single_config_entry": true
 }
