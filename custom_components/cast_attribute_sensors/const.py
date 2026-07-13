@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "5.0.0"
+VERSION: Final = "6.0.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
