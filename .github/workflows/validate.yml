@@ -17,9 +17,13 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # The repository metadata is optional for this personal project.
-          # Brand validation remains enabled and checks the local brand/icon.png.
           ignore: description topics
+
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
 
   lint-and-test:
     runs-on: ubuntu-latest
@@ -30,7 +34,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: python -m pip install ruff
+      - run: python -m pip install ruff pyyaml
       - run: ruff check custom_components tests
       - run: python -m compileall -q custom_components
       - run: python -m unittest discover -s tests -v
+      - name: Validate JSON and YAML
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import yaml
+
+          for path in Path('.').rglob('*.json'):
+              json.loads(path.read_text(encoding='utf-8'))
+          for path in Path('.').rglob('*.yaml'):
+              yaml.safe_load(path.read_text(encoding='utf-8'))
+          for path in Path('.').rglob('*.yml'):
+              yaml.safe_load(path.read_text(encoding='utf-8'))
+          PY
