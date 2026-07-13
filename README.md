@@ -1,85 +1,53 @@
-# Cast Metadata & Controls for Home Assistant
+# Cast Metadata & TV Controls for Home Assistant
 
-A fully local Home Assistant custom integration that enhances every media player provided by the native **Google Cast** integration.
+A fully local Home Assistant helper integration that enhances Google Cast devices and native television entities with lazily created metadata sensors and capability-aware controls.
 
-It provides two things:
+## Features
 
-1. **Lazy metadata entities** — every Cast state attribute becomes its own sensor only after that attribute reports a real value for the first time.
-2. **Convenient control entities** — app selection, playback buttons, volume control, mute control, and arbitrary Cast app launching.
+### Lazy Cast metadata sensors
 
-## Main behavior
-
-For a Cast source such as:
+For every `media_player` provided by Home Assistant's native Google Cast integration, the integration creates:
 
 ```text
-media_player.living_room_tv
+sensor.<device>_cast_state
+sensor.<device>_cast_attributes
 ```
 
-entities appear under the same Home Assistant device.
-
-### Metadata sensors
-
-The integration always creates two base sensors:
+Every additional Cast attribute becomes a separate sensor only after Home Assistant reports a non-null value for it for the first time. Examples include:
 
 ```text
-sensor.living_room_tv_cast_state
-sensor.living_room_tv_cast_attributes
+sensor.<device>_cast_media_title
+sensor.<device>_cast_media_artist
+sensor.<device>_cast_app_id
+sensor.<device>_cast_app_name
+sensor.<device>_cast_media_duration
 ```
 
-Attribute sensors are **not pre-created**. They appear only when Home Assistant first exposes a non-null value, for example:
+This is dynamic rather than limited to a hard-coded metadata list. App-specific attributes exposed later by YouTube, Spotify, Plex, Netflix, or another receiver are detected automatically.
 
-```text
-sensor.living_room_tv_cast_media_title
-sensor.living_room_tv_cast_media_artist
-sensor.living_room_tv_cast_app_id
-sensor.living_room_tv_cast_app_name
-sensor.living_room_tv_cast_media_duration
-```
+After a sensor has appeared once, it remains registered permanently. When that attribute is temporarily absent, the sensor becomes `unknown` and resumes automatically when the value returns.
 
-This applies to every attribute reported by the source Cast `media_player`, including app-specific attributes that appear only in YouTube, Spotify, Plex, Netflix, or another receiver application.
+The **Cast attributes** sensor contains a complete snapshot of the source entity's current attributes.
 
-After an attribute sensor has appeared once, it remains registered permanently. When the source temporarily stops reporting that attribute, the sensor becomes `unknown` and automatically resumes when the value returns.
+### Cast receiver controls
 
-> Upgrading from v1 removes the old pre-created v1 sensor definitions once. v2 then recreates sensors lazily as their values appear.
+Controls are created for each native Cast entity and become available only when the source advertises the required capability:
 
-### Complete attribute snapshot
+- Cast receiver power
+- Start receiver
+- Soft restart of the Cast receiver application
+- Close current Cast application
+- Play/pause and stop
+- Previous and next track
+- Rewind and forward 10 seconds
+- Media-position percentage slider
+- Volume percentage, volume up/down, and mute
+- Shuffle and repeat controls
+- Learned Cast application selector
 
-The **Cast attributes** sensor uses the number of currently reported attributes as its state and carries the complete source attribute dictionary as its own attributes.
+The Cast app selector starts with Home/Backdrop, YouTube, and Default Media Receiver. It permanently learns additional `app_id` and `app_name` pairs when they appear on each device.
 
-```jinja
-{{ state_attr('sensor.living_room_tv_cast_attributes', 'media_title') }}
-{{ state_attr('sensor.living_room_tv_cast_attributes', 'app_name') }}
-```
-
-## Cast controls
-
-Each Cast device receives the following control entities when supported by the native media player:
-
-- **Cast app** select — launches known apps and applications previously observed on that device.
-- **Start receiver** button.
-- **Play / pause** button.
-- **Stop media** button.
-- **Previous track** and **Next track** buttons.
-- **Volume down** and **Volume up** buttons.
-- **Close app** button.
-- **Cast volume** number slider from 0 to 100%.
-- **Cast mute** switch.
-
-Unsupported actions are shown as unavailable rather than sending invalid commands.
-
-### App learning
-
-The app selector starts with:
-
-- Home / Backdrop
-- YouTube
-- Default Media Receiver
-
-Whenever the source reports a new `app_id` and `app_name`, that application is saved for that Cast device and becomes a permanent option in its selector.
-
-### Launch any app ID
-
-For an app not yet learned, call:
+Launch an arbitrary Cast receiver app by ID:
 
 ```yaml
 action: cast_attribute_sensors.launch_app
@@ -88,44 +56,85 @@ data:
   app_id: 233637DE
 ```
 
-The service accepts multiple Cast media players.
+### Native TV power and inputs
 
-Launching an app by ID only asks the receiver to start that application. Some receiver apps require additional app-specific data or content before showing anything useful.
+The integration also tracks non-Cast `media_player` entities representing televisions.
 
-## Long and structured values
+Depending on the capabilities exposed by the television's native Home Assistant integration, it creates:
 
-Home Assistant entity-state strings are limited to 255 characters, and sensor states cannot directly contain dictionaries or lists.
+- TV power switch
+- TV volume percentage, volume up/down, and mute
+- TV input selector for HDMI, tuner, console, receiver, and other published sources
+- Play/pause
+- Native TV restart button when the same device exposes a real restart entity
 
-This integration therefore:
+The input selector appears only when the source entity publishes `source_list` and supports `media_player.select_source`.
 
-- Uses short primitive values directly as sensor state.
-- JSON-encodes short lists and dictionaries.
-- Summarizes values that cannot fit safely in state.
-- Preserves the full original value in the sensor attribute `raw_value`.
-- Sets `value_truncated: true` when the visible state is only a preview or summary.
+### Android and Google TV applications
+
+When a TV is configured through Home Assistant's **Android TV Remote** integration, the integration adds:
+
+- TV app selector
+- Home and Back buttons
+- Reload-current-app button
+- Settings, Info, channel, directional-pad, and Select controls; less common controls are disabled by default to avoid clutter
+- Arbitrary remote-command service
+
+The TV app selector combines:
+
+- Common Android/Google TV packages
+- Apps configured in Android TV Remote options
+- Apps learned when their package IDs become active
+
+Launch an application by Android package ID:
+
+```yaml
+action: cast_attribute_sensors.launch_tv_app
+data:
+  entity_id: media_player.living_room_tv_remote
+  app_id: com.google.android.youtube.tv
+```
+
+Send an Android TV Remote command:
+
+```yaml
+action: cast_attribute_sensors.send_tv_command
+data:
+  entity_id: media_player.living_room_tv_remote
+  command: HOME
+```
+
+Plain Chromecast devices cannot expose or launch the television's installed Android apps. For installed-app selection, the television must expose a compatible Android TV Remote media-player entity.
+
+## Long and structured metadata
+
+Home Assistant limits entity-state strings to 255 characters, and entity states cannot directly contain dictionaries or lists. The integration therefore:
+
+- Uses short primitive values directly as state
+- JSON-encodes short structured values
+- Summarizes values that cannot safely fit in state
+- Preserves the complete value in the sensor attribute `raw_value`
+- Sets `value_truncated: true` when the visible state is a preview or summary
 
 ```jinja
 {{ state_attr('sensor.living_room_tv_cast_some_large_attribute', 'raw_value') }}
 ```
 
-## Installation with HACS
-
-This repository must be public for HACS.
+## HACS installation
 
 1. Open **HACS**.
-2. Open the three-dot menu.
-3. Select **Custom repositories**.
-4. Add:
+2. Open the three-dot menu and select **Custom repositories**.
+3. Add:
 
    ```text
    https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls
    ```
 
-5. Select **Integration**.
-6. Install **Cast Metadata & Controls**.
-7. Restart Home Assistant.
-8. Open **Settings → Devices & services → Add integration**.
-9. Search for **Cast Metadata & Controls** and complete the one-step setup.
+4. Select category **Integration**.
+5. Install **Cast Metadata & TV Controls**.
+6. Restart Home Assistant.
+7. Go to **Settings → Devices & services → Add integration**.
+8. Search for **Cast Metadata & TV Controls** and complete the one-step setup.
 
 No YAML configuration is required.
 
@@ -147,9 +156,7 @@ Restart Home Assistant and add the integration from **Settings → Devices & ser
 
 ## Recorder considerations
 
-The integration can create many metadata sensors. Each attribute sensor writes only when its own value changes, but the complete snapshot sensor changes whenever any source attribute changes.
-
-To exclude only the snapshot sensors from Recorder:
+Metadata sensors write only when their own values change. The complete snapshot sensor changes whenever any source attribute changes. To exclude snapshot entities from Recorder:
 
 ```yaml
 recorder:
@@ -160,23 +167,17 @@ recorder:
 
 ## Availability and lifecycle
 
-- Existing and newly added native Cast entities are detected automatically.
-- Source entity renames are followed through the entity registry.
-- Source unavailable: generated entities become unavailable.
-- Attribute temporarily absent: its existing sensor becomes `unknown`.
-- Source removed: generated entities remain registered but unavailable, preserving their identity if the source returns.
-- All communication remains through Home Assistant's native Cast integration; this helper opens no additional Cast or cloud connection.
+- Existing and newly added Cast and TV entities are detected automatically.
+- Entity renames are followed through the Home Assistant entity registry.
+- Unsupported controls remain unavailable instead of sending invalid commands.
+- Removed sources leave generated entities registered but unavailable, preserving stable identities if the source returns.
+- The integration communicates through Home Assistant's existing Cast, television, and Android TV Remote integrations; it opens no separate device or cloud connection.
 
-## Scope
+## Scope and limitations
 
-A source is included when its entity-registry entry has:
+“Every Cast attribute” means every state attribute that Home Assistant exposes on the native Cast `media_player` entity. Private internal `pychromecast` objects are outside this integration's scope.
 
-```text
-domain: media_player
-platform: cast
-```
-
-“Every attribute” means every state attribute Home Assistant exposes on that Cast `media_player`. Private internal `pychromecast` objects that Home Assistant does not publish are outside this integration's scope.
+A Cast receiver restart is a soft application restart, not a hardware reboot. A real TV restart control is exposed only when the television's native integration provides a restart entity.
 
 ## License
 
