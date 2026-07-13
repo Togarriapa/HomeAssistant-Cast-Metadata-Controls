@@ -1,16 +1,36 @@
 # Changelog
 
+## 6.0.0
+
+- Added automatic versioned GitHub releases so HACS installs the current code instead of remaining on the last recognized release.
+- Rebuilt controller entities during migration to eliminate layouts retained from versions 3–5.
+- Consolidated Android TV Remote, Android TV ADB, Google Cast, and manufacturer entities into one controller per matched physical television.
+- Kept standalone Chromecast dongles, Cast speakers, and displays as independent devices.
+- Grouped every dynamically discovered Cast and TV sensor under the matching integration-owned physical device.
+- Added runtime app learning: newly observed TV and Cast apps are added to the controller immediately and persisted across restarts.
+- Separated source options into `TV App ·`, `Cast ·`, and `Input ·` mechanisms.
+- Filtered transient Ready-to-Cast receiver states from native TV application options.
+- Improved switching from Cast sessions back to native TV apps and physical inputs.
+- Added local HACS icon/logo assets and README banner artwork.
+- Re-enabled HACS brand validation.
+- Added cleanup of obsolete empty virtual controller devices.
+
+## 5.0.0
+
+- Added physical-device matching through Home Assistant device IDs, network connections, areas, and normalized names.
+- Moved metadata from matching Cast and TV representations onto the same virtual controller device.
+- Reclassified the integration from a helper to a hub integration.
+
 ## 4.0.0
 
-- Replaced the large standalone control-entity set with one compact `media_player` controller per Cast or TV source.
-- Added dedicated virtual controller devices owned by this integration, so devices and entities appear under **Settings → Devices & services → Cast Metadata & TV Controls**.
-- Added automatic migration that removes the old generated button, number, select, and switch entities while preserving metadata sensors.
-- Corrected relative seeking by calculating the live playback position from `media_position_updated_at` before applying the offset.
-- Added `cast_attribute_sensors.seek_relative` for reliable forward and rewind actions.
+- Replaced the large standalone control-entity set with compact `media_player` controllers.
+- Added integration-owned controller devices.
+- Removed generated button, number, select, and switch clutter during migration.
+- Corrected relative seeking by calculating the live playback position from `media_position_updated_at`.
+- Added `cast_attribute_sensors.seek_relative`.
 - Expanded the built-in Android/Google TV application catalogue.
-- Added application aggregation from Android TV Remote configuration, learned foreground apps, and matching Android TV (ADB) source lists.
-- Added `cast_attribute_sensors.register_tv_app` for permanently registering missing applications.
-- Combined applications and physical inputs in the compact TV controller source selector with clear `App ·` and `Input ·` prefixes.
+- Added configured, learned, and Android TV ADB application sources.
+- Added `cast_attribute_sensors.register_tv_app`.
 
 ## 3.0.0
 

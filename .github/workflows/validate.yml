@@ -17,9 +17,9 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          # Repository description, topics, and brand assets are optional for this
-          # personal HACS repository. All installation and structure checks remain active.
-          ignore: brands description topics
+          # The repository metadata is optional for this personal project.
+          # Brand validation remains enabled and checks the local brand/icon.png.
+          ignore: description topics
 
   lint-and-test:
     runs-on: ubuntu-latest
