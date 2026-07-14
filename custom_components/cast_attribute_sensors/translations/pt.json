@@ -1,96 +1,33 @@
 {
   "title": "Metadados Cast e Controlos de TV",
-  "config": {
-    "step": {
-      "user": {
-        "title": "Metadados Cast e Controlos de TV",
-        "description": "Cria um dispositivo controlador organizado para cada televisão, Chromecast, coluna Cast ou ecrã inteligente físico."
-      }
-    },
-    "abort": {
-      "already_configured": "A integração já está configurada."
-    }
-  },
+  "config": {"step": {"user": {"title": "Metadados Cast e Controlos de TV", "description": "Cria um dispositivo controlador organizado para cada televisão, Chromecast, coluna Cast ou ecrã inteligente físico."}}, "abort": {"already_configured": "A integração já está configurada."}},
   "options": {
     "step": {
-      "init": {
-        "title": "Configuração dos controladores",
-        "description": "Combine entidades que pertencem ao mesmo equipamento físico ou escolha qual integração nativa deve tratar cada capacidade.",
-        "menu_options": {
-          "add_group": "Combinar entidades de origem",
-          "remove_group": "Remover um grupo explícito",
-          "clear_groups": "Limpar todos os grupos explícitos",
-          "configure_routes": "Encaminhar capacidades do controlador",
-          "clear_routes": "Limpar todos os encaminhamentos"
-        }
-      },
-      "add_group": {
-        "title": "Combinar entidades de origem",
-        "description": "Selecione todas as entidades media_player nativas que representam a mesma televisão física.",
-        "data": {
-          "name": "Nome do dispositivo",
-          "entities": "Entidades de origem"
-        }
-      },
-      "remove_group": {
-        "title": "Remover um grupo explícito",
-        "data": {
-          "group_id": "Grupo"
-        }
-      },
-      "clear_groups": {
-        "title": "Limpar todos os grupos explícitos",
-        "description": "O agrupamento automático será usado após o recarregamento da integração.",
-        "data": {
-          "confirm": "Confirmar"
-        }
-      },
-      "configure_routes": {
-        "title": "Encaminhar capacidades do controlador",
-        "description": "Escolha o controlador físico que pretende configurar.",
-        "data": {
-          "group_key": "Dispositivo físico"
-        }
-      },
-      "route_group": {
-        "title": "Encaminhamento de capacidades para {name}",
-        "description": "Automático é recomendado. Escolha uma entidade específica apenas quando uma integração for mais fiável para essa capacidade.",
-        "data": {
-          "power": "Energia",
-          "volume": "Volume e silêncio",
-          "playback": "Reprodução",
-          "seek": "Avanço e recuo",
-          "metadata": "Metadados multimédia",
-          "tv_apps": "Aplicações nativas da TV",
-          "cast_apps": "Aplicações Cast",
-          "inputs": "Entradas físicas",
-          "navigation": "Navegação remota",
-          "restart": "Reinício"
-        }
-      },
-      "clear_routes": {
-        "title": "Limpar todos os encaminhamentos",
-        "description": "Todos os controladores voltarão à seleção automática de origem.",
-        "data": {
-          "confirm": "Confirmar"
-        }
-      }
+      "init": {"title": "Configuração dos controladores", "description": "Configure agrupamento físico, encaminhamento de capacidades, aplicações, atividades, tempos e Wake-on-LAN.", "menu_options": {"add_group": "Combinar entidades de origem", "remove_group": "Remover um grupo explícito", "clear_groups": "Limpar todos os grupos explícitos", "configure_routes": "Encaminhar capacidades do controlador", "clear_routes": "Limpar todos os encaminhamentos", "manage_apps": "Gerir aplicações", "clear_app_preferences": "Limpar preferências das aplicações", "configure_timing": "Configurar tempos dos comandos", "configure_wol": "Configurar Wake-on-LAN", "add_activity": "Adicionar ou substituir atividade", "remove_activity": "Remover atividade", "clear_activities": "Limpar todas as atividades"}},
+      "add_group": {"title": "Combinar entidades de origem", "description": "Selecione todas as entidades media_player nativas que representam a mesma televisão física.", "data": {"name": "Nome do dispositivo", "entities": "Entidades de origem"}},
+      "remove_group": {"title": "Remover um grupo explícito", "data": {"group_id": "Grupo"}},
+      "clear_groups": {"title": "Limpar todos os grupos explícitos", "description": "O agrupamento automático será usado após o recarregamento da integração.", "data": {"confirm": "Confirmar"}},
+      "configure_routes": {"title": "Encaminhar capacidades do controlador", "description": "Escolha o controlador físico que pretende configurar.", "data": {"group_key": "Dispositivo físico"}},
+      "route_group": {"title": "Encaminhamento de capacidades para {name}", "description": "Automático é recomendado. Escolha uma entidade específica apenas quando uma integração for mais fiável para essa capacidade.", "data": {"power": "Energia", "volume": "Volume e silêncio", "playback": "Reprodução", "seek": "Avanço e recuo", "metadata": "Metadados multimédia", "tv_apps": "Aplicações nativas da TV", "cast_apps": "Aplicações Cast", "inputs": "Entradas físicas", "navigation": "Navegação remota", "restart": "Reinício"}},
+      "clear_routes": {"title": "Limpar todos os encaminhamentos", "description": "Todos os controladores voltarão à seleção automática de origem.", "data": {"confirm": "Confirmar"}},
+      "manage_apps": {"title": "Gerir aplicações", "description": "Escolha um controlador físico.", "data": {"group_key": "Dispositivo físico"}},
+      "choose_app": {"title": "Escolher aplicação", "description": "Selecione uma aplicação descoberta, aprendida ou registada.", "data": {"app_key": "Aplicação"}},
+      "edit_app": {"title": "Preferências da aplicação", "description": "Mude o nome, oculte, marque como favorita ou altere a ordem. Limpe os valores personalizados para voltar ao comportamento automático.", "data": {"display_name": "Nome personalizado", "visible": "Visível", "favorite": "Favorita", "order": "Ordem"}},
+      "clear_app_preferences": {"title": "Limpar preferências das aplicações", "description": "Repõe nomes, visibilidade, favoritos e ordem automáticos.", "data": {"confirm": "Confirmar"}},
+      "configure_timing": {"title": "Configurar tempos dos comandos", "description": "Escolha um controlador físico.", "data": {"group_key": "Dispositivo físico"}},
+      "timing_group": {"title": "Tempos dos comandos", "description": "Aumente os tempos apenas quando a televisão for lenta a sair do Cast, confirmar uma aplicação ou reiniciar.", "data": {"power_delay": "Espera após ligar", "cast_exit_delay": "Espera após sair do Cast", "app_confirm_delay": "Espera de confirmação da aplicação", "retry_delay": "Espera antes de repetir aplicação", "restart_delay": "Espera do reinício por energia"}},
+      "configure_wol": {"title": "Configurar Wake-on-LAN", "description": "Escolha um controlador físico.", "data": {"group_key": "Dispositivo físico"}},
+      "wol_group": {"title": "Wake-on-LAN", "description": "É usado apenas quando não existe forma nativa de ligar. Limpe o endereço MAC para desativar.", "data": {"mac": "Endereço MAC", "broadcast_address": "Endereço de broadcast", "broadcast_port": "Porta de broadcast"}},
+      "add_activity": {"title": "Adicionar ou substituir atividade", "description": "Escolha um controlador físico.", "data": {"group_key": "Dispositivo físico"}},
+      "activity_group": {"title": "Predefinição de atividade", "description": "Uma atividade liga o dispositivo e pode escolher uma aplicação/entrada, definir o volume e o silêncio. Reutilizar um nome substitui a atividade existente.", "data": {"activity_name": "Nome da atividade", "activity_source": "Aplicação ou entrada", "activity_volume": "Volume (-1 mantém atual)", "activity_mute": "Estado de silêncio"}},
+      "remove_activity": {"title": "Remover atividade", "data": {"activity_id": "Atividade"}},
+      "clear_activities": {"title": "Limpar todas as atividades", "data": {"confirm": "Confirmar"}}
     },
-    "error": {
-      "two_entities_required": "Selecione pelo menos duas entidades de origem diferentes."
-    },
-    "abort": {
-      "group_not_found": "O dispositivo físico selecionado já não está disponível."
-    }
+    "error": {"two_entities_required": "Selecione pelo menos duas entidades de origem diferentes."},
+    "abort": {"group_not_found": "O dispositivo físico selecionado já não está disponível."}
   },
   "issues": {
-    "group_members_missing": {
-      "title": "Faltam entidades de origem em {name}",
-      "description": "O grupo de dispositivo físico {name} tem {count} entidades de origem em falta. Abra a configuração da integração e recrie ou remova o grupo."
-    },
-    "route_source_missing": {
-      "title": "Existem encaminhamentos obsoletos em {name}",
-      "description": "As seguintes capacidades apontam para entidades que já não existem: {capabilities}. Abra a configuração da integração e selecione Automático ou entidades substitutas."
-    }
+    "group_members_missing": {"title": "Faltam entidades de origem em {name}", "description": "O grupo de dispositivo físico {name} tem {count} entidades de origem em falta. Abra a configuração da integração e recrie ou remova o grupo."},
+    "route_source_missing": {"title": "Existem encaminhamentos obsoletos em {name}", "description": "As seguintes capacidades apontam para entidades que já não existem: {capabilities}. Abra a configuração da integração e selecione Automático ou entidades substitutas."}
   }
 }
