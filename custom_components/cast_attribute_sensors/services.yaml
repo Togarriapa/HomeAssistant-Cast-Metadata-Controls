@@ -132,3 +132,16 @@ run_activity:
       example: Movie Night
       selector:
         text:
+
+skip_ad:
+  name: Skip YouTube ad now
+  description: Skip an ad only when a Cast receiver reports the official skip-ad capability or Android TV ADB positively detects a visible Skip-ad control.
+  fields:
+    entity_id:
+      name: Controller
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: cast_attribute_sensors
+          multiple: true
