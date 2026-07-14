@@ -108,6 +108,9 @@ class DynamicSensorPlatform:
 
     @callback
     def _register_all_sources(self) -> None:
+        # Topology callbacks are independent. Refreshing here guarantees that the
+        # physical device exists before newly discovered metadata entities are added.
+        self.runtime.refresh_groups()
         for source_id in self.runtime.manager.source_ids:
             self._register_source(source_id)
 
@@ -133,6 +136,8 @@ class DynamicSensorPlatform:
 
     @callback
     def _register_source(self, source_id: str) -> None:
+        if self.runtime.group_for_source(source_id) is None:
+            self.runtime.refresh_groups()
         if source_id not in self._source_unsubscribers:
             self._source_unsubscribers[source_id] = (
                 self.runtime.manager.async_subscribe_source(

@@ -14,12 +14,14 @@
   "options": {
     "step": {
       "init": {
-        "title": "Physical device grouping",
-        "description": "Automatic grouping uses device IDs, network connections, areas, and names. Add an explicit group only when Home Assistant represents one physical TV as multiple devices.",
+        "title": "Controller configuration",
+        "description": "Combine source entities that belong to one physical device, or select which native integration should handle each capability.",
         "menu_options": {
           "add_group": "Combine source entities",
           "remove_group": "Remove an explicit group",
-          "clear_groups": "Clear all explicit groups"
+          "clear_groups": "Clear all explicit groups",
+          "configure_routes": "Route controller capabilities",
+          "clear_routes": "Clear all capability routes"
         }
       },
       "add_group": {
@@ -42,10 +44,53 @@
         "data": {
           "confirm": "Confirm"
         }
+      },
+      "configure_routes": {
+        "title": "Route controller capabilities",
+        "description": "Choose the physical controller to configure.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "route_group": {
+        "title": "Capability routing for {name}",
+        "description": "Automatic is recommended. Select a specific native entity only when one integration is more reliable for that capability.",
+        "data": {
+          "power": "Power",
+          "volume": "Volume and mute",
+          "playback": "Playback",
+          "seek": "Seeking",
+          "metadata": "Media metadata",
+          "tv_apps": "Native TV applications",
+          "cast_apps": "Cast applications",
+          "inputs": "Physical inputs",
+          "navigation": "Remote navigation",
+          "restart": "Restart"
+        }
+      },
+      "clear_routes": {
+        "title": "Clear all capability routes",
+        "description": "Every controller will return to automatic source selection.",
+        "data": {
+          "confirm": "Confirm"
+        }
       }
     },
     "error": {
       "two_entities_required": "Select at least two different source entities."
+    },
+    "abort": {
+      "group_not_found": "The selected physical device is no longer available."
+    }
+  },
+  "issues": {
+    "group_members_missing": {
+      "title": "Source entities are missing from {name}",
+      "description": "The explicit physical-device group {name} has {count} missing source entities. Open the integration configuration and recreate or remove the group."
+    },
+    "route_source_missing": {
+      "title": "Capability routes are stale for {name}",
+      "description": "The following routed capabilities reference source entities that no longer exist: {capabilities}. Open the integration configuration and return them to Automatic or select replacement entities."
     }
   }
 }

@@ -26,6 +26,16 @@ from .const import (
     BUTTON_DOMAIN,
     CAST_APP_PREFIX,
     INPUT_PREFIX,
+    ROUTE_CAST_APPS,
+    ROUTE_INPUTS,
+    ROUTE_METADATA,
+    ROUTE_NAVIGATION,
+    ROUTE_PLAYBACK,
+    ROUTE_POWER,
+    ROUTE_RESTART,
+    ROUTE_SEEK,
+    ROUTE_TV_APPS,
+    ROUTE_VOLUME,
     TRANSIENT_APP_MARKERS,
     TV_APP_PREFIX,
     UID_SEPARATOR,
@@ -105,11 +115,49 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Create one controller for every resolved physical group."""
-    runtime: IntegrationRuntime = entry.runtime_data
-    async_add_entities(
-        [UnifiedMediaController(runtime, group) for group in runtime.groups]
-    )
+    """Create controllers and hot-add newly discovered independent devices."""
+    platform = DynamicControllerPlatform(entry.runtime_data, async_add_entities)
+    platform.start()
+    entry.async_on_unload(platform.stop)
+
+
+class DynamicControllerPlatform:
+    """Own the controller entities for the lifetime of the config entry."""
+
+    def __init__(
+        self,
+        runtime: IntegrationRuntime,
+        async_add_entities: AddConfigEntryEntitiesCallback,
+    ) -> None:
+        self.runtime = runtime
+        self._async_add_entities = async_add_entities
+        self._entities: dict[str, UnifiedMediaController] = {}
+        self._unsubscribe = None
+
+    @callback
+    def start(self) -> None:
+        self._add_groups(self.runtime.groups)
+        self._unsubscribe = self.runtime.async_subscribe_group_additions(
+            self._add_groups
+        )
+
+    @callback
+    def stop(self) -> None:
+        if self._unsubscribe:
+            self._unsubscribe()
+            self._unsubscribe = None
+
+    @callback
+    def _add_groups(self, groups: tuple[PhysicalGroup, ...]) -> None:
+        entities: list[UnifiedMediaController] = []
+        for group in groups:
+            if group.key in self._entities:
+                continue
+            entity = UnifiedMediaController(self.runtime, group)
+            self._entities[group.key] = entity
+            entities.append(entity)
+        if entities:
+            self._async_add_entities(entities)
 
 
 class UnifiedMediaController(MediaPlayerEntity):
@@ -160,6 +208,26 @@ class UnifiedMediaController(MediaPlayerEntity):
             for source_id in self.group.source_ids
         )
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        health, details = self.runtime.health(self.group)
+        return {
+            "physical_device_id": self.group.key,
+            "health": health,
+            "source_entities": [
+                self.runtime.manager.get_entity_id(source_id)
+                for source_id in self.group.source_ids
+            ],
+            "source_platforms": [
+                self.runtime.manager.platform(source_id)
+                for source_id in self.group.source_ids
+            ],
+            "capability_routes": self.runtime.configured_routes().get(
+                self.group.key, {}
+            ),
+            **details,
+        }
+
     def _source_ids(self, *, cast: bool | None = None) -> tuple[str, ...]:
         result: list[str] = []
         for source_id in self.group.source_ids:
@@ -169,6 +237,14 @@ class UnifiedMediaController(MediaPlayerEntity):
             if cast is None or source.is_cast is cast:
                 result.append(source_id)
         return tuple(result)
+
+    def _routed_source(self, capability: str) -> str | None:
+        source_id = self.runtime.route_source(self.group, capability)
+        return (
+            source_id
+            if source_id and self.runtime.manager.available(source_id)
+            else None
+        )
 
     def _active_cast_source(self) -> str | None:
         for source_id in self._source_ids(cast=True):
@@ -183,10 +259,7 @@ class UnifiedMediaController(MediaPlayerEntity):
 
     def _primary_native_source(self) -> str | None:
         native_ids = self._source_ids(cast=False)
-        priorities = {
-            ANDROID_TV_REMOTE_DOMAIN: 0,
-            ANDROID_TV_ADB_DOMAIN: 2,
-        }
+        priorities = {ANDROID_TV_REMOTE_DOMAIN: 0, ANDROID_TV_ADB_DOMAIN: 2}
         candidates = sorted(
             native_ids,
             key=lambda source_id: (
@@ -204,6 +277,9 @@ class UnifiedMediaController(MediaPlayerEntity):
         )
 
     def _active_state(self) -> State | None:
+        routed = self._routed_source(ROUTE_METADATA)
+        if routed:
+            return self.runtime.manager.get_state(routed)
         active_cast = self._active_cast_source()
         if active_cast:
             return self.runtime.manager.get_state(active_cast)
@@ -211,8 +287,15 @@ class UnifiedMediaController(MediaPlayerEntity):
         return self.runtime.manager.get_state(primary)
 
     def _target_for_feature(
-        self, feature: MediaPlayerEntityFeature, *, prefer_cast: bool = False
+        self,
+        feature: MediaPlayerEntityFeature,
+        capability: str,
+        *,
+        prefer_cast: bool = False,
     ) -> str | None:
+        routed = self._routed_source(capability)
+        if routed and self.runtime.manager.supports(routed, feature):
+            return routed
         ordered: list[str] = []
         active_cast = self._active_cast_source()
         if prefer_cast and active_cast:
@@ -251,13 +334,15 @@ class UnifiedMediaController(MediaPlayerEntity):
 
     @property
     def volume_level(self) -> float | None:
-        state = self._active_state()
+        source = self._routed_source(ROUTE_VOLUME)
+        state = self.runtime.manager.get_state(source) if source else self._active_state()
         value = state.attributes.get("volume_level") if state else None
         return float(value) if isinstance(value, (int, float)) else None
 
     @property
     def is_volume_muted(self) -> bool | None:
-        state = self._active_state()
+        source = self._routed_source(ROUTE_VOLUME)
+        state = self.runtime.manager.get_state(source) if source else self._active_state()
         value = state.attributes.get("is_volume_muted") if state else None
         return value if isinstance(value, bool) else None
 
@@ -326,11 +411,21 @@ class UnifiedMediaController(MediaPlayerEntity):
         value = state.attributes.get(name) if state else None
         return str(value) if value is not None else None
 
+    def _category_ids(
+        self, route: str, *, cast: bool | None
+    ) -> tuple[str, ...]:
+        routed = self.runtime.route_source(self.group, route)
+        if routed:
+            source = self.runtime.manager.get_source(routed)
+            if source is not None and (cast is None or source.is_cast is cast):
+                return (routed,)
+        return self._source_ids(cast=cast)
+
     def _source_actions(self) -> dict[str, SourceAction]:
         actions: dict[str, SourceAction] = {}
         native_names: set[str] = set()
 
-        for source_id in self._source_ids(cast=False):
+        for source_id in self._category_ids(ROUTE_TV_APPS, cast=False):
             if self.runtime.manager.platform(source_id) != ANDROID_TV_REMOTE_DOMAIN:
                 continue
             apps = self.runtime.manager.tv_apps(source_id)
@@ -346,26 +441,35 @@ class UnifiedMediaController(MediaPlayerEntity):
                 actions[option] = SourceAction("tv_app", source_id, app_id)
                 native_names.add(name.casefold().strip())
 
-        for source_id in self._source_ids(cast=False):
-            platform = self.runtime.manager.platform(source_id)
+        for source_id in self._category_ids(ROUTE_TV_APPS, cast=False):
+            if self.runtime.manager.platform(source_id) != ANDROID_TV_ADB_DOMAIN:
+                continue
             for native_source in self.runtime.manager.sources(source_id):
                 normalized = native_source.casefold().strip()
-                if not normalized or _is_transient_app(native_source):
+                if (
+                    not normalized
+                    or _is_transient_app(native_source)
+                    or normalized in native_names
+                ):
                     continue
-                if platform == ANDROID_TV_ADB_DOMAIN:
-                    if normalized in native_names:
-                        continue
-                    actions.setdefault(
-                        f"{TV_APP_PREFIX}{native_source}",
-                        SourceAction("adb_app", source_id, native_source),
-                    )
-                elif platform != ANDROID_TV_REMOTE_DOMAIN:
-                    actions.setdefault(
-                        f"{INPUT_PREFIX}{native_source}",
-                        SourceAction("input", source_id, native_source),
-                    )
+                actions.setdefault(
+                    f"{TV_APP_PREFIX}{native_source}",
+                    SourceAction("adb_app", source_id, native_source),
+                )
 
-        for source_id in self._source_ids(cast=True):
+        for source_id in self._category_ids(ROUTE_INPUTS, cast=False):
+            platform = self.runtime.manager.platform(source_id)
+            if platform in {ANDROID_TV_REMOTE_DOMAIN, ANDROID_TV_ADB_DOMAIN}:
+                continue
+            for native_source in self.runtime.manager.sources(source_id):
+                if not native_source.strip() or _is_transient_app(native_source):
+                    continue
+                actions.setdefault(
+                    f"{INPUT_PREFIX}{native_source}",
+                    SourceAction("input", source_id, native_source),
+                )
+
+        for source_id in self._category_ids(ROUTE_CAST_APPS, cast=True):
             apps = self.runtime.manager.cast_apps(source_id)
             counts = Counter(apps.values())
             for app_id, name in sorted(
@@ -375,7 +479,6 @@ class UnifiedMediaController(MediaPlayerEntity):
                 if counts[name] > 1 or option in actions:
                     option = f"{option} [{app_id}]"
                 actions[option] = SourceAction("cast_app", source_id, app_id)
-
         return actions
 
     @property
@@ -397,7 +500,6 @@ class UnifiedMediaController(MediaPlayerEntity):
                         and action.value == app_id
                     ):
                         return option
-
         for source_id in self._source_ids(cast=False):
             state = self.runtime.manager.get_state(source_id)
             if state is None:
@@ -417,11 +519,17 @@ class UnifiedMediaController(MediaPlayerEntity):
         return None
 
     async def _leave_cast_session(self) -> None:
-        remote_available = self.runtime.manager.remote_entity_id(self.group.source_ids)
+        source_ids = self.group.source_ids
+        navigation = self.runtime.route_source(self.group, ROUTE_NAVIGATION)
+        if navigation:
+            source_ids = (navigation,)
+        remote_available = self.runtime.manager.remote_entity_id(source_ids)
         if remote_available:
-            await self.runtime.manager.send_command(self.group.source_ids, "HOME")
+            await self.runtime.manager.send_command(source_ids, "HOME")
         for source_id in self._source_ids(cast=True):
-            if self.runtime.manager.supports(source_id, MediaPlayerEntityFeature.STOP):
+            if self.runtime.manager.supports(
+                source_id, MediaPlayerEntityFeature.STOP
+            ):
                 await self.runtime.manager.call_media_player(source_id, "media_stop")
         if remote_available:
             await asyncio.sleep(0.75)
@@ -429,20 +537,21 @@ class UnifiedMediaController(MediaPlayerEntity):
     async def async_select_source(self, source: str) -> None:
         action = self._source_actions()[source]
         if action.kind == "cast_app":
-            power_target = self._target_for_feature(MediaPlayerEntityFeature.TURN_ON)
+            power_target = self._target_for_feature(
+                MediaPlayerEntityFeature.TURN_ON, ROUTE_POWER
+            )
             if power_target and self.state == MediaPlayerState.OFF:
                 await self.runtime.manager.call_media_player(power_target, "turn_on")
                 await asyncio.sleep(0.8)
             await self.runtime.manager.launch_cast_app(action.source_id, action.value)
             return
-
         await self._leave_cast_session()
         if action.kind == "tv_app":
             await self.runtime.manager.launch_tv_app(action.source_id, action.value)
             await asyncio.sleep(1.25)
             state = self.runtime.manager.get_state(action.source_id)
             if state is not None and state.attributes.get("app_id") != action.value:
-                await self.runtime.manager.send_command(self.group.source_ids, "HOME")
+                await self.async_send_command("HOME")
                 await asyncio.sleep(0.5)
                 await self.runtime.manager.launch_tv_app(action.source_id, action.value)
             return
@@ -453,29 +562,42 @@ class UnifiedMediaController(MediaPlayerEntity):
     async def _call_feature(
         self,
         feature: MediaPlayerEntityFeature,
+        capability: str,
         service: str,
         data: dict[str, Any] | None = None,
         *,
         prefer_cast: bool = False,
     ) -> None:
-        target = self._target_for_feature(feature, prefer_cast=prefer_cast)
+        target = self._target_for_feature(
+            feature, capability, prefer_cast=prefer_cast
+        )
         if target:
             await self.runtime.manager.call_media_player(target, service, data)
 
     async def async_turn_on(self) -> None:
-        await self._call_feature(MediaPlayerEntityFeature.TURN_ON, "turn_on")
+        await self._call_feature(
+            MediaPlayerEntityFeature.TURN_ON, ROUTE_POWER, "turn_on"
+        )
 
     async def async_turn_off(self) -> None:
-        await self._call_feature(MediaPlayerEntityFeature.TURN_OFF, "turn_off")
+        await self._call_feature(
+            MediaPlayerEntityFeature.TURN_OFF, ROUTE_POWER, "turn_off"
+        )
 
     async def async_media_play(self) -> None:
         await self._call_feature(
-            MediaPlayerEntityFeature.PLAY, "media_play", prefer_cast=True
+            MediaPlayerEntityFeature.PLAY,
+            ROUTE_PLAYBACK,
+            "media_play",
+            prefer_cast=True,
         )
 
     async def async_media_pause(self) -> None:
         await self._call_feature(
-            MediaPlayerEntityFeature.PAUSE, "media_pause", prefer_cast=True
+            MediaPlayerEntityFeature.PAUSE,
+            ROUTE_PLAYBACK,
+            "media_pause",
+            prefer_cast=True,
         )
 
     async def async_media_play_pause(self) -> None:
@@ -486,24 +608,32 @@ class UnifiedMediaController(MediaPlayerEntity):
 
     async def async_media_stop(self) -> None:
         await self._call_feature(
-            MediaPlayerEntityFeature.STOP, "media_stop", prefer_cast=True
+            MediaPlayerEntityFeature.STOP,
+            ROUTE_PLAYBACK,
+            "media_stop",
+            prefer_cast=True,
         )
 
     async def async_media_previous_track(self) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.PREVIOUS_TRACK,
+            ROUTE_PLAYBACK,
             "media_previous_track",
             prefer_cast=True,
         )
 
     async def async_media_next_track(self) -> None:
         await self._call_feature(
-            MediaPlayerEntityFeature.NEXT_TRACK, "media_next_track", prefer_cast=True
+            MediaPlayerEntityFeature.NEXT_TRACK,
+            ROUTE_PLAYBACK,
+            "media_next_track",
+            prefer_cast=True,
         )
 
     async def async_media_seek(self, position: float) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.SEEK,
+            ROUTE_SEEK,
             "media_seek",
             {"seek_position": position},
             prefer_cast=True,
@@ -523,6 +653,7 @@ class UnifiedMediaController(MediaPlayerEntity):
     async def async_set_volume_level(self, volume: float) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.VOLUME_SET,
+            ROUTE_VOLUME,
             "volume_set",
             {"volume_level": volume},
         )
@@ -530,19 +661,25 @@ class UnifiedMediaController(MediaPlayerEntity):
     async def async_mute_volume(self, mute: bool) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.VOLUME_MUTE,
+            ROUTE_VOLUME,
             "volume_mute",
             {"is_volume_muted": mute},
         )
 
     async def async_volume_up(self) -> None:
-        await self._call_feature(MediaPlayerEntityFeature.VOLUME_STEP, "volume_up")
+        await self._call_feature(
+            MediaPlayerEntityFeature.VOLUME_STEP, ROUTE_VOLUME, "volume_up"
+        )
 
     async def async_volume_down(self) -> None:
-        await self._call_feature(MediaPlayerEntityFeature.VOLUME_STEP, "volume_down")
+        await self._call_feature(
+            MediaPlayerEntityFeature.VOLUME_STEP, ROUTE_VOLUME, "volume_down"
+        )
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.SHUFFLE_SET,
+            ROUTE_PLAYBACK,
             "shuffle_set",
             {"shuffle": shuffle},
             prefer_cast=True,
@@ -551,18 +688,25 @@ class UnifiedMediaController(MediaPlayerEntity):
     async def async_set_repeat(self, repeat: str) -> None:
         await self._call_feature(
             MediaPlayerEntityFeature.REPEAT_SET,
+            ROUTE_PLAYBACK,
             "repeat_set",
             {"repeat": repeat},
             prefer_cast=True,
         )
 
     async def async_send_command(self, command: str) -> None:
-        await self.runtime.manager.send_command(self.group.source_ids, command)
+        source_ids = self.group.source_ids
+        routed = self.runtime.route_source(self.group, ROUTE_NAVIGATION)
+        if routed:
+            source_ids = (routed,)
+        await self.runtime.manager.send_command(source_ids, command)
 
     async def async_restart(self) -> None:
-        restart_entity = self.runtime.manager.restart_button_entity_id(
-            self.group.source_ids
-        )
+        source_ids = self.group.source_ids
+        routed = self.runtime.route_source(self.group, ROUTE_RESTART)
+        if routed:
+            source_ids = (routed,)
+        restart_entity = self.runtime.manager.restart_button_entity_id(source_ids)
         if restart_entity:
             await self.hass.services.async_call(
                 BUTTON_DOMAIN,
@@ -571,15 +715,17 @@ class UnifiedMediaController(MediaPlayerEntity):
                 blocking=True,
             )
             return
-
-        off_target = self._target_for_feature(MediaPlayerEntityFeature.TURN_OFF)
-        on_target = self._target_for_feature(MediaPlayerEntityFeature.TURN_ON)
+        off_target = self._target_for_feature(
+            MediaPlayerEntityFeature.TURN_OFF, ROUTE_POWER
+        )
+        on_target = self._target_for_feature(
+            MediaPlayerEntityFeature.TURN_ON, ROUTE_POWER
+        )
         if off_target and on_target:
             await self.runtime.manager.call_media_player(off_target, "turn_off")
             await asyncio.sleep(2)
             await self.runtime.manager.call_media_player(on_target, "turn_on")
             return
-
         await self._leave_cast_session()
-        if self.runtime.manager.remote_entity_id(self.group.source_ids):
-            await self.runtime.manager.send_command(self.group.source_ids, "HOME")
+        if self.runtime.manager.remote_entity_id(source_ids):
+            await self.runtime.manager.send_command(source_ids, "HOME")

@@ -29,10 +29,15 @@ from .const import (
     SERVICE_SEEK_RELATIVE,
     SERVICE_SEND_COMMAND,
 )
+from .identity import PhysicalIdentityStore
 from .runtime import IntegrationRuntime
 from .source_manager import SourceManager
 
-PLATFORMS: list[Platform] = [Platform.MEDIA_PLAYER, Platform.SENSOR]
+PLATFORMS: list[Platform] = [
+    Platform.MEDIA_PLAYER,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+]
 
 
 def _entity_ids(call: ServiceCall) -> list[str]:
@@ -73,8 +78,15 @@ async def _async_cleanup_orphan_devices(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the single integration hub."""
     manager = SourceManager(hass)
+    identities = PhysicalIdentityStore(hass)
     await manager.async_initialize()
-    runtime = IntegrationRuntime(hass=hass, entry=entry, manager=manager)
+    await identities.async_initialize()
+    runtime = IntegrationRuntime(
+        hass=hass,
+        entry=entry,
+        manager=manager,
+        identities=identities,
+    )
     runtime.refresh_groups()
     runtime.start_topology_watch()
     entry.runtime_data = runtime
@@ -237,17 +249,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ):
         hass.services.async_remove(DOMAIN, service)
     await entry.runtime_data.manager.async_stop()
+    await entry.runtime_data.identities.async_stop()
     return True
 
 
 async def async_migrate_entry(
     hass: HomeAssistant, entry: config_entries.ConfigEntry
 ) -> bool:
-    """Rebuild controls once while retaining learned apps and v2 metadata sensors."""
+    """Rebuild controllers for persistent identities and retain metadata sensors."""
     registry = er.async_get(hass)
-    if entry.version < 7:
+    if entry.version < 8:
         for entity in list(er.async_entries_for_config_entry(registry, entry.entry_id)):
             if entity.domain in {
+                "binary_sensor",
                 "button",
                 "media_player",
                 "number",
@@ -255,5 +269,5 @@ async def async_migrate_entry(
                 "switch",
             } or (entity.domain == "sensor" and entity.unique_id.startswith("v1|")):
                 registry.async_remove(entity.entity_id)
-        hass.config_entries.async_update_entry(entry, version=7)
+        hass.config_entries.async_update_entry(entry, version=8)
     return True

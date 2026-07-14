@@ -4,19 +4,24 @@
 
 # Cast Metadata & TV Controls
 
-A fully local Home Assistant integration that combines every useful representation of a television—Google Cast, Android TV Remote, Android TV ADB, and manufacturer integrations—into **one organized controller device per physical device**.
+A fully local Home Assistant integration that combines Google Cast, Android TV Remote, Android TV ADB, and manufacturer TV integrations into **one organized controller device per physical device**.
 
-## Version 7 architecture
-
-Version 7 is a clean consolidation release:
+## Version 7.1 architecture
 
 - One integration entry under **Settings → Devices & services → Integrations**.
 - One integration-owned device for each independent physical TV, Chromecast, Cast speaker, or smart display.
-- One primary `media_player` controller per physical device.
-- Every discovered metadata sensor is attached to that same device.
-- New sensors are created automatically when new non-null attributes first appear.
+- One compact `media_player` controller per physical device.
+- Every discovered metadata sensor belongs to that same device.
+- New sensors are created automatically after new non-null attributes first appear.
+- Completely new independent devices are hot-added without interrupting existing controllers.
 - No generated button, select, number, or switch entity swarm.
-- Advanced operations are exposed as Home Assistant actions instead of extra helper entities.
+- Advanced operations are exposed as Home Assistant actions.
+
+## Persistent physical-device identity
+
+Version 7.1 stores a durable local identity profile for each physical device. It combines stable evidence such as network connections, MAC addresses, normalized name and area, platform identity, and Home Assistant device-registry information.
+
+This lets a controller reconnect to the same integration-owned device when a native Cast, Android TV, ADB, or manufacturer entity is removed and recreated. Learned applications and metadata sensor registrations remain local.
 
 ## Physical-device grouping
 
@@ -38,9 +43,9 @@ TV manufacturer media player
 
 Standalone Chromecast dongles, Cast speakers, and smart displays remain separate devices.
 
-### Explicit grouping when automatic matching is insufficient
+### Explicit grouping
 
-Some manufacturers expose the same hardware with unrelated names or identifiers. Version 7 provides a reliable override:
+When integrations expose unrelated names or identifiers:
 
 1. Open **Settings → Devices & services**.
 2. Open **Cast Metadata & TV Controls**.
@@ -48,23 +53,75 @@ Some manufacturers expose the same hardware with unrelated names or identifiers.
 4. Choose **Combine source entities**.
 5. Select every native `media_player` entity representing the same physical TV.
 
-The integration reloads automatically and rebuilds one device. Explicit groups use stable entity-registry IDs, so normal entity renames do not break the grouping.
+## Capability routing
+
+Automatic routing remains the recommended default. For unusual installations, version 7.1 can force each capability through the most reliable native entity.
+
+Open:
+
+**Settings → Devices & services → Cast Metadata & TV Controls → Configure → Route controller capabilities**
+
+Configurable categories:
+
+```text
+Power
+Volume and mute
+Playback
+Seeking
+Media metadata
+Native TV applications
+Cast applications
+Physical inputs
+Remote navigation
+Restart
+```
+
+Example:
+
+```text
+Power: Samsung TV
+Volume: AV Receiver
+Playback: Google Cast
+Metadata: Google Cast
+Native apps: Android TV Remote
+Inputs: Sony Bravia
+Navigation: Android TV Remote
+Restart: Android TV ADB
+```
+
+A route that points to a removed entity produces a Home Assistant Repairs warning instead of silently failing.
+
+## Controller health and Repairs
+
+Every physical device receives a diagnostic `Controller problem` binary sensor. Its attributes report:
+
+- Persistent physical-device ID
+- Native source entities and platforms
+- Available and unavailable sources
+- Configured capability routes
+- Stale routes
+- Overall health: `healthy`, `degraded`, or `unavailable`
+
+Home Assistant Repairs also reports:
+
+- Missing members from an explicit physical-device group
+- Capability routes whose native source entity no longer exists
 
 ## Controller capabilities
 
-The controller exposes only features genuinely supported by at least one underlying entity:
+The controller exposes features genuinely supported by at least one underlying entity:
 
-- Power on and off.
-- Play, pause, stop, previous, and next.
-- Volume, mute, and volume stepping.
-- Shuffle and repeat.
-- Corrected absolute and relative seeking.
-- Android/Google TV application launching.
-- Cast receiver application launching.
-- HDMI, tuner, console, AV receiver, and manufacturer inputs.
-- Current app, title, artist, album, artwork, duration, and playback position.
+- Power on and off
+- Play, pause, stop, previous, and next
+- Volume, mute, and volume stepping
+- Shuffle and repeat
+- Corrected absolute and relative seeking
+- Android/Google TV application launching
+- Cast receiver application launching
+- HDMI, tuner, console, AV receiver, and manufacturer inputs
+- Current app, title, artist, album, artwork, duration, and position
 
-The source selector clearly separates mechanisms:
+The source selector separates mechanisms clearly:
 
 ```text
 TV App · YouTube
@@ -74,26 +131,19 @@ Input · HDMI 1
 Input · PlayStation 5
 ```
 
-When switching from a Cast session to a native app or input, the integration:
+When switching from Cast to a native app or input, the integration leaves the active receiver session, returns to TV Home when available, launches the requested target, and retries one failed native-app launch.
 
-1. Sends the TV to Home through Android TV Remote when available.
-2. Stops the active Cast session.
-3. Launches the requested native app or selects the requested input.
-4. Retries a native app launch once when the TV does not confirm the requested package.
-
-Transient pseudo-apps such as **Ready to Cast** are filtered from native TV application options.
+Transient pseudo-apps such as **Ready to Cast** are filtered.
 
 ## Application discovery
 
-Android TV Remote does not expose a complete inventory of installed applications. Version 7 combines:
+The application catalogue combines:
 
-- A built-in catalogue of common Android/Google TV apps.
-- Apps configured in Android TV Remote.
-- Apps learned when they become active.
-- Android TV ADB source entries.
-- Apps registered manually through the integration action.
-
-Learned and manually registered apps are stored locally and restored after restart. Version 7 also imports the learned-app databases used by versions 2–6.
+- Common Android/Google TV applications
+- Apps configured in Android TV Remote
+- Apps learned when active
+- Android TV ADB source entries
+- Manually registered applications
 
 ### Register a missing TV app
 
@@ -107,7 +157,7 @@ data:
 
 ## Dynamic metadata sensors
 
-The integration watches every underlying source. A sensor is created after its value first appears, then remains registered and becomes `unknown` whenever the source temporarily stops reporting it.
+Every underlying source is watched continuously. A sensor is created after its value first appears, remains registered, and becomes `unknown` when the source temporarily stops reporting it.
 
 Examples:
 
@@ -119,11 +169,38 @@ sensor.living_room_tv_android_tv_remote_app_name
 sensor.living_room_tv_manufacturer_source
 ```
 
-Structured or long values are preserved in `raw_value` when they cannot fit safely in the entity state. Complete attribute snapshots are available as disabled-by-default diagnostic sensors.
+Structured and long values are retained through attributes. Complete source snapshots are available as disabled-by-default diagnostic sensors.
+
+## Unified TV Card
+
+The companion HACS dashboard repository provides a single responsive control card:
+
+[**Togarriapa/HomeAssistant-Unified-TV-Card**](https://github.com/Togarriapa/HomeAssistant-Unified-TV-Card)
+
+It includes:
+
+- Dynamic application dropdown
+- Separate physical-input dropdown
+- Mute directly beside the volume slider
+- Power and restart
+- Playback and corrected relative seeking
+- Android/Google TV directional remote
+- Artwork, current media, application, and source
+- Dynamic quick-app buttons and optional diagnostics
+
+Example:
+
+```yaml
+type: custom:unified-tv-card
+entity: media_player.living_room_tv_controller
+show_artwork: true
+show_remote: true
+seek_seconds: 10
+```
 
 ## Useful actions
 
-### Seek forward or backward from the corrected live position
+### Seek relative to the corrected live position
 
 ```yaml
 action: cast_attribute_sensors.seek_relative
@@ -132,9 +209,9 @@ data:
   seconds: 10
 ```
 
-Use `-10` to rewind. The calculation accounts for elapsed time since `media_position_updated_at`, avoiding the old behaviour where “forward 10 seconds” could seek backwards.
+Use a negative value to rewind.
 
-### Send a TV remote command
+### Send a remote command
 
 ```yaml
 action: cast_attribute_sensors.send_command
@@ -143,7 +220,7 @@ data:
   command: HOME
 ```
 
-### Restart the device
+### Restart the physical device
 
 ```yaml
 action: cast_attribute_sensors.restart_device
@@ -151,9 +228,9 @@ data:
   entity_id: media_player.living_room_tv_controller
 ```
 
-The action uses a native restart button when one exists. Otherwise it performs the safest available controlled power or receiver reset.
+The action prefers a genuine native restart entity. Otherwise it uses the safest available local power or receiver reset.
 
-Additional actions:
+Other actions:
 
 - `cast_attribute_sensors.launch_cast_app`
 - `cast_attribute_sensors.launch_tv_app`
@@ -161,6 +238,17 @@ Additional actions:
 - `cast_attribute_sensors.send_command`
 - `cast_attribute_sensors.seek_relative`
 - `cast_attribute_sensors.restart_device`
+
+## Automatic discovery of new devices
+
+When a new supported TV or Cast `media_player` is added to Home Assistant:
+
+1. The source manager detects it.
+2. Physical identity and grouping are calculated.
+3. A completely new independent controller, health sensor, and metadata listeners are hot-added.
+4. Existing controllers remain available.
+
+A controlled integration reload occurs only when a new source must be attached to an existing physical device or an existing membership changes, because Home Assistant must then move registered sensors between devices.
 
 ## Installation with HACS
 
@@ -173,28 +261,25 @@ Additional actions:
    ```
 
 4. Select **Integration**.
-5. Install **Cast Metadata & TV Controls**.
-6. Restart Home Assistant.
-7. Open **Settings → Devices & services → Add integration**.
-8. Add **Cast Metadata & TV Controls**.
+5. Install and restart Home Assistant.
+6. Open **Settings → Devices & services → Add integration**.
+7. Add **Cast Metadata & TV Controls**.
 
 No YAML configuration is required.
 
-## Upgrading from versions 1–6
+## Upgrading from 7.0
 
-Version 7 performs a one-time migration:
+Version 7.1 performs a one-time controller migration:
 
-- Removes old generated controller/control entities.
-- Preserves existing v2 metadata sensor registrations.
-- Preserves learned application data.
-- Rebuilds controllers using the unified physical-device model.
-- Removes obsolete empty virtual devices after setup.
+- Rebuilds controller and health entities with persistent physical IDs
+- Preserves learned application data
+- Preserves metadata sensor unique IDs and registrations
+- Reattaches sensors to the persistent integration device
+- Removes obsolete empty virtual devices after setup
 
-After installing v7 through HACS, restart Home Assistant and allow approximately ten seconds for registry cleanup.
+After updating through HACS, restart Home Assistant and allow approximately ten seconds for device-registry cleanup.
 
 ## Recorder considerations
-
-To exclude complete diagnostic snapshots while retaining individual sensors:
 
 ```yaml
 recorder:
@@ -205,7 +290,7 @@ recorder:
 
 ## Scope and privacy
 
-The integration uses only data and actions already exposed by Home Assistant’s native integrations. It adds no independent cloud account, external API, telemetry, or polling loop.
+The integration uses only information and actions already exposed by Home Assistant’s native integrations. It adds no independent cloud account, external API, telemetry, or polling loop.
 
 ## License
 
