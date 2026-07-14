@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.3.0
+
+- Added conservative same-room family/model matching for complementary manufacturer, Android TV Remote, Android TV ADB, and Cast representations.
+- Added automatic grouping for Sony BRAVIA entities whose integrations expose different model-oriented names.
+- Kept generic manufacturer-only matches excluded to avoid combining two unrelated televisions in the same room.
+- Normalized generated physical-device names by removing repeated Controller, Remote, ADB, Cast, and media-player suffixes.
+- Added delayed cleanup of stale controller, health, and transition entities after physical-device groups are merged.
+- Added regression tests for the BRAVIA naming pattern and same-area safety boundary.
+
 ## 7.2.0
 
 - Added a per-device application manager for renaming, hiding, favouriting, and ordering native TV and Cast applications.

@@ -69,10 +69,10 @@ class DynamicHealthPlatform:
 
 
 class ControllerHealthBinarySensor(BinarySensorEntity):
-    """Report degraded or unavailable controller source topology."""
+    """Report a controller that has no usable source or a broken route."""
 
     _attr_has_entity_name = True
-    _attr_name = "Controller problem"
+    _attr_name = "Problem"
     _attr_icon = "mdi:heart-pulse"
     _attr_should_poll = False
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
@@ -97,7 +97,10 @@ class ControllerHealthBinarySensor(BinarySensorEntity):
 
     @callback
     def _async_source_updated(
-        self, source_id: str, old_state: State | None, new_state: State | None
+        self,
+        source_id: str,
+        old_state: State | None,
+        new_state: State | None,
     ) -> None:
         if self.entity_id:
             self.async_write_ha_state()

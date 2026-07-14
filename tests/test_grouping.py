@@ -30,6 +30,7 @@ for module_name in ("const", "grouping"):
 from custom_components.cast_attribute_sensors.grouping import (  # noqa: E402
     SourceSnapshot,
     build_physical_groups,
+    clean_device_name,
     normalized_device_name,
 )
 
@@ -65,6 +66,12 @@ class GroupingTests(unittest.TestCase):
         )
         self.assertEqual(
             normalized_device_name("Living Room Chromecast Built-in"), "livingroom"
+        )
+
+    def test_display_name_removes_repeated_controller_suffix(self) -> None:
+        self.assertEqual(
+            clean_device_name("BRAVIA KE-55XH8096 Controller Controller"),
+            "BRAVIA KE-55XH8096",
         )
 
     def test_shared_device_id_groups_all_representations(self) -> None:
@@ -106,6 +113,44 @@ class GroupingTests(unittest.TestCase):
             ]
         )
         self.assertEqual(len(groups), 1)
+
+    def test_bravia_native_and_android_names_group_in_same_area(self) -> None:
+        groups = build_physical_groups(
+            [
+                source(
+                    "sony",
+                    "BRAVIA KE-55XH8096 Controller",
+                    platform="braviatv",
+                ),
+                source(
+                    "remote",
+                    "BRAVIA 4K GB ATV3 Controller",
+                    platform="androidtv_remote",
+                ),
+            ]
+        )
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(set(groups[0].source_ids), {"sony", "remote"})
+        self.assertNotIn("Controller", groups[0].name)
+
+    def test_family_match_requires_same_area(self) -> None:
+        groups = build_physical_groups(
+            [
+                source(
+                    "sony",
+                    "BRAVIA KE-55XH8096",
+                    platform="braviatv",
+                    area_id="living_room",
+                ),
+                source(
+                    "remote",
+                    "BRAVIA 4K GB ATV3",
+                    platform="androidtv_remote",
+                    area_id="bedroom",
+                ),
+            ]
+        )
+        self.assertEqual(len(groups), 2)
 
     def test_different_named_devices_in_same_area_remain_separate(self) -> None:
         groups = build_physical_groups(
