@@ -9,6 +9,8 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -135,13 +137,14 @@ class IntegrationRuntime:
         source_id = self.configured_routes().get(group.key, {}).get(capability)
         return source_id if source_id in group.source_ids else None
 
-    def device_info(self, group: PhysicalGroup) -> DeviceInfo:
+    def _native_device(self, group: PhysicalGroup):
         source = self.manager.get_source(group.primary_source_id)
-        native_device = (
-            self.manager.device_registry.async_get(source.device_id)
-            if source is not None and source.device_id is not None
-            else None
-        )
+        if source is None or source.device_id is None:
+            return None
+        return self.manager.device_registry.async_get(source.device_id)
+
+    def device_info(self, group: PhysicalGroup) -> DeviceInfo:
+        native_device = self._native_device(group)
         manufacturer = (
             native_device.manufacturer
             if native_device is not None and native_device.manufacturer
@@ -288,6 +291,40 @@ class IntegrationRuntime:
     @callback
     def register_controller(self, entity_id: str, controller: Any) -> None:
         self.controllers[entity_id] = controller
+        registry_entry = er.async_get(self.hass).async_get(entity_id)
+        if registry_entry is None or registry_entry.device_id is None:
+            return
+        device_registry = dr.async_get(self.hass)
+        unified_device = device_registry.async_get(registry_entry.device_id)
+        if unified_device is None:
+            return
+        native_device = self._native_device(controller.group)
+        updates: dict[str, Any] = {}
+        if unified_device.entry_type is not None:
+            updates["entry_type"] = None
+        if (
+            unified_device.area_id is None
+            and native_device is not None
+            and native_device.area_id is not None
+        ):
+            updates["area_id"] = native_device.area_id
+        if (
+            native_device is not None
+            and native_device.manufacturer
+            and unified_device.manufacturer != native_device.manufacturer
+        ):
+            updates["manufacturer"] = native_device.manufacturer
+        if (
+            native_device is not None
+            and native_device.model
+            and unified_device.model != native_device.model
+        ):
+            updates["model"] = native_device.model
+        if updates:
+            device_registry.async_update_device(
+                unified_device.id,
+                **updates,
+            )
 
     @callback
     def unregister_controller(self, entity_id: str) -> None:
