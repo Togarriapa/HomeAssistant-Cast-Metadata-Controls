@@ -23,12 +23,10 @@ from .const import (
     CONF_ACTIVITY_NAME,
     CONF_ACTIVITY_SOURCE,
     CONF_ACTIVITY_VOLUME,
-    CONF_APP_CONFIRM_DELAY,
     CONF_APP_KEY,
     CONF_APP_PREFERENCES,
     CONF_BROADCAST_ADDRESS,
     CONF_BROADCAST_PORT,
-    CONF_CAST_EXIT_DELAY,
     CONF_DELAYS,
     CONF_DISPLAY_NAME,
     CONF_ENTITIES,
@@ -40,9 +38,6 @@ from .const import (
     CONF_MAC,
     CONF_MEMBERS,
     CONF_ORDER,
-    CONF_POWER_DELAY,
-    CONF_RESTART_DELAY,
-    CONF_RETRY_DELAY,
     CONF_ROUTES,
     CONF_VISIBLE,
     CONF_WOL,
@@ -243,12 +238,7 @@ class ControllerOptionsFlow(OptionsFlowWithReload):
         current = preferences.get(group_key, {}).get(app_key, {})
         if user_input is not None:
             group_preferences = preferences.setdefault(group_key, {})
-            preference = {
-                CONF_DISPLAY_NAME: str(user_input.get(CONF_DISPLAY_NAME, "")).strip(),
-                CONF_VISIBLE: bool(user_input.get(CONF_VISIBLE, True)),
-                CONF_FAVORITE: bool(user_input.get(CONF_FAVORITE, False)),
-                CONF_ORDER: int(user_input.get(CONF_ORDER, 1000)),
-            }
+            preference = {CONF_DISPLAY_NAME: str(user_input.get(CONF_DISPLAY_NAME, "")).strip(), CONF_VISIBLE: bool(user_input.get(CONF_VISIBLE, True)), CONF_FAVORITE: bool(user_input.get(CONF_FAVORITE, False)), CONF_ORDER: int(user_input.get(CONF_ORDER, 1000))}
             if preference == {CONF_DISPLAY_NAME: "", CONF_VISIBLE: True, CONF_FAVORITE: False, CONF_ORDER: 1000}:
                 group_preferences.pop(app_key, None)
             else:
@@ -281,10 +271,7 @@ class ControllerOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             delays[group_key] = {key: float(user_input[key]) for key in DEFAULT_DELAYS}
             return self._save(**{CONF_DELAYS: delays})
-        schema = {
-            vol.Required(key, default=float(current.get(key, default))): selector.NumberSelector(selector.NumberSelectorConfig(min=0, max=30, step=0.05, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"))
-            for key, default in DEFAULT_DELAYS.items()
-        }
+        schema = {vol.Required(key, default=float(current.get(key, default))): selector.NumberSelector(selector.NumberSelectorConfig(min=0, max=30, step=0.05, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s")) for key, default in DEFAULT_DELAYS.items()}
         return self.async_show_form(step_id="timing_group", data_schema=vol.Schema(schema))
 
     async def async_step_configure_wol(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -301,11 +288,7 @@ class ControllerOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             mac = str(user_input.get(CONF_MAC, "")).strip()
             if mac:
-                wol[group.key] = {
-                    CONF_MAC: mac,
-                    CONF_BROADCAST_ADDRESS: str(user_input.get(CONF_BROADCAST_ADDRESS, "")).strip(),
-                    CONF_BROADCAST_PORT: int(user_input.get(CONF_BROADCAST_PORT, 9)),
-                }
+                wol[group.key] = {CONF_MAC: mac, CONF_BROADCAST_ADDRESS: str(user_input.get(CONF_BROADCAST_ADDRESS, "")).strip(), CONF_BROADCAST_PORT: int(user_input.get(CONF_BROADCAST_PORT, 9))}
             else:
                 wol.pop(group.key, None)
             return self._save(**{CONF_WOL: wol})
@@ -334,12 +317,7 @@ class ControllerOptionsFlow(OptionsFlowWithReload):
             group_activities = activities.setdefault(controller.group.key, [])
             group_activities = [item for item in group_activities if str(item.get(CONF_ACTIVITY_NAME, "")).casefold() != name.casefold()]
             mute_value = str(user_input.get(CONF_ACTIVITY_MUTE, _UNCHANGED))
-            activity: dict[str, Any] = {
-                CONF_ACTIVITY_ID: uuid4().hex,
-                CONF_ACTIVITY_NAME: name,
-                CONF_ACTIVITY_SOURCE: "" if user_input.get(CONF_ACTIVITY_SOURCE) == _UNCHANGED else str(user_input.get(CONF_ACTIVITY_SOURCE, "")),
-                CONF_ACTIVITY_VOLUME: float(user_input.get(CONF_ACTIVITY_VOLUME, -1)),
-            }
+            activity: dict[str, Any] = {CONF_ACTIVITY_ID: uuid4().hex, CONF_ACTIVITY_NAME: name, CONF_ACTIVITY_SOURCE: "" if user_input.get(CONF_ACTIVITY_SOURCE) == _UNCHANGED else str(user_input.get(CONF_ACTIVITY_SOURCE, "")), CONF_ACTIVITY_VOLUME: float(user_input.get(CONF_ACTIVITY_VOLUME, -1))}
             if mute_value != _UNCHANGED:
                 activity[CONF_ACTIVITY_MUTE] = mute_value == "muted"
             group_activities.append(activity)
@@ -357,11 +335,7 @@ class ControllerOptionsFlow(OptionsFlowWithReload):
 
     async def async_step_remove_activity(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         activities = self._activities()
-        options = [
-            selector.SelectOptionDict(value=f"{group_key}::{item.get(CONF_ACTIVITY_ID)}", label=f"{self.config_entry.runtime_data.group_by_key(group_key).name if self.config_entry.runtime_data.group_by_key(group_key) else group_key} · {item.get(CONF_ACTIVITY_NAME)}")
-            for group_key, items in activities.items()
-            for item in items
-        ]
+        options = [selector.SelectOptionDict(value=f"{group_key}::{item.get(CONF_ACTIVITY_ID)}", label=f"{self.config_entry.runtime_data.group_by_key(group_key).name if self.config_entry.runtime_data.group_by_key(group_key) else group_key} · {item.get(CONF_ACTIVITY_NAME)}") for group_key, items in activities.items() for item in items]
         if user_input is not None:
             group_key, activity_id = str(user_input[CONF_ACTIVITY_ID]).split("::", 1)
             activities[group_key] = [item for item in activities.get(group_key, []) if str(item.get(CONF_ACTIVITY_ID)) != activity_id]
