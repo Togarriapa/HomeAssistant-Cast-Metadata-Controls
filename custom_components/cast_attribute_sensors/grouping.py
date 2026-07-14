@@ -63,6 +63,8 @@ class SourceSnapshot:
     area_id: str | None
     is_cast: bool
     is_tv: bool
+    manufacturer: str | None = None
+    model: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,11 +90,13 @@ def normalized_device_name(name: str) -> str:
     return _NON_ALNUM.sub("", stripped)
 
 
-def _significant_name_tokens(name: str) -> frozenset[str]:
+def _significant_tokens(*values: str | None) -> frozenset[str]:
     """Return distinctive model/family tokens suitable for same-room matching."""
     return frozenset(
         token
-        for token in _TOKEN.findall(clean_device_name(name).casefold())
+        for value in values
+        if value
+        for token in _TOKEN.findall(clean_device_name(value).casefold())
         if len(token) >= 5
         and token not in _MATCH_STOPWORDS
         and not token.isdecimal()
@@ -100,7 +104,7 @@ def _significant_name_tokens(name: str) -> frozenset[str]:
 
 
 def _same_room_family_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
-    """Match complementary TV representations with a shared family/model token."""
+    """Match complementary TV representations with shared hardware evidence."""
     if not first.area_id or first.area_id != second.area_id:
         return False
 
@@ -115,9 +119,18 @@ def _same_room_family_match(first: SourceSnapshot, second: SourceSnapshot) -> bo
     if not (is_tv_cast_pair or is_complementary_tv_pair):
         return False
 
+    first_tokens = _significant_tokens(first.name, first.model)
+    second_tokens = _significant_tokens(second.name, second.model)
+    if first_tokens & second_tokens:
+        return True
+
+    first_manufacturer = (first.manufacturer or "").casefold().strip()
+    second_manufacturer = (second.manufacturer or "").casefold().strip()
     return bool(
-        _significant_name_tokens(first.name)
-        & _significant_name_tokens(second.name)
+        first_manufacturer
+        and first_manufacturer == second_manufacturer
+        and "bravia" in first_tokens
+        and "bravia" in second_tokens
     )
 
 
@@ -149,12 +162,14 @@ def _strong_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
 
 
 def _source_priority(source: SourceSnapshot) -> tuple[int, str]:
-    if source.platform == ANDROID_TV_REMOTE_DOMAIN:
-        priority = 0
-    elif source.is_tv and source.platform not in {
+    # Manufacturer-native integrations provide the best identity and device name.
+    if source.is_tv and source.platform not in {
+        ANDROID_TV_REMOTE_DOMAIN,
         ANDROID_TV_ADB_DOMAIN,
         CAST_DOMAIN,
     }:
+        priority = 0
+    elif source.platform == ANDROID_TV_REMOTE_DOMAIN:
         priority = 1
     elif source.platform == ANDROID_TV_ADB_DOMAIN:
         priority = 2
@@ -242,8 +257,6 @@ def build_physical_groups(
         )
         claimed.update(source.registry_id for source in members)
 
-    # Non-Cast TV-like sources are already handled. Every remaining Cast source is
-    # an independent Chromecast, speaker, display, or an unpaired TV receiver.
     for source in remaining_cast:
         groups.append(
             PhysicalGroup(
@@ -256,8 +269,6 @@ def build_physical_groups(
         )
         claimed.add(source.registry_id)
 
-    # Preserve unusual media-player sources that were manually classified as TV but
-    # could not be clustered for any reason.
     for source in source_list:
         if source.registry_id in claimed:
             continue
