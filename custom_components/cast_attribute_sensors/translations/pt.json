@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Metadados Cast e Controlos de TV",
-        "description": "Cria um único dispositivo de controlo organizado para cada TV física, Chromecast, coluna Cast ou ecrã inteligente."
+        "description": "Cria um dispositivo controlador organizado para cada televisão, Chromecast, coluna Cast ou ecrã inteligente físico."
       }
     },
     "abort": {
@@ -14,12 +14,14 @@
   "options": {
     "step": {
       "init": {
-        "title": "Agrupamento de dispositivos físicos",
-        "description": "O agrupamento automático utiliza IDs de dispositivo, ligações de rede, áreas e nomes. Crie um grupo explícito apenas quando o Home Assistant representar a mesma TV física como vários dispositivos.",
+        "title": "Configuração dos controladores",
+        "description": "Combine entidades que pertencem ao mesmo equipamento físico ou escolha qual integração nativa deve tratar cada capacidade.",
         "menu_options": {
           "add_group": "Combinar entidades de origem",
           "remove_group": "Remover um grupo explícito",
-          "clear_groups": "Limpar todos os grupos explícitos"
+          "clear_groups": "Limpar todos os grupos explícitos",
+          "configure_routes": "Encaminhar capacidades do controlador",
+          "clear_routes": "Limpar todos os encaminhamentos"
         }
       },
       "add_group": {
@@ -38,7 +40,37 @@
       },
       "clear_groups": {
         "title": "Limpar todos os grupos explícitos",
-        "description": "O agrupamento automático será utilizado depois de a integração recarregar.",
+        "description": "O agrupamento automático será usado após o recarregamento da integração.",
+        "data": {
+          "confirm": "Confirmar"
+        }
+      },
+      "configure_routes": {
+        "title": "Encaminhar capacidades do controlador",
+        "description": "Escolha o controlador físico que pretende configurar.",
+        "data": {
+          "group_key": "Dispositivo físico"
+        }
+      },
+      "route_group": {
+        "title": "Encaminhamento de capacidades para {name}",
+        "description": "Automático é recomendado. Escolha uma entidade específica apenas quando uma integração for mais fiável para essa capacidade.",
+        "data": {
+          "power": "Energia",
+          "volume": "Volume e silêncio",
+          "playback": "Reprodução",
+          "seek": "Avanço e recuo",
+          "metadata": "Metadados multimédia",
+          "tv_apps": "Aplicações nativas da TV",
+          "cast_apps": "Aplicações Cast",
+          "inputs": "Entradas físicas",
+          "navigation": "Navegação remota",
+          "restart": "Reinício"
+        }
+      },
+      "clear_routes": {
+        "title": "Limpar todos os encaminhamentos",
+        "description": "Todos os controladores voltarão à seleção automática de origem.",
         "data": {
           "confirm": "Confirmar"
         }
@@ -46,6 +78,19 @@
     },
     "error": {
       "two_entities_required": "Selecione pelo menos duas entidades de origem diferentes."
+    },
+    "abort": {
+      "group_not_found": "O dispositivo físico selecionado já não está disponível."
+    }
+  },
+  "issues": {
+    "group_members_missing": {
+      "title": "Faltam entidades de origem em {name}",
+      "description": "O grupo de dispositivo físico {name} tem {count} entidades de origem em falta. Abra a configuração da integração e recrie ou remova o grupo."
+    },
+    "route_source_missing": {
+      "title": "Existem encaminhamentos obsoletos em {name}",
+      "description": "As seguintes capacidades apontam para entidades que já não existem: {capabilities}. Abra a configuração da integração e selecione Automático ou entidades substitutas."
     }
   }
 }
