@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "7.1.0"
+VERSION: Final = "7.2.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -13,6 +13,8 @@ MEDIA_PLAYER_DOMAIN: Final = "media_player"
 REMOTE_DOMAIN: Final = "remote"
 BUTTON_DOMAIN: Final = "button"
 SENSOR_DOMAIN: Final = "sensor"
+EVENT_DOMAIN: Final = "event"
+WAKE_ON_LAN_DOMAIN: Final = "wake_on_lan"
 
 TV_PLATFORMS: Final[frozenset[str]] = frozenset(
     {ANDROID_TV_REMOTE_DOMAIN, ANDROID_TV_ADB_DOMAIN}
@@ -25,6 +27,28 @@ CONF_GROUP_NAME: Final = "name"
 CONF_MEMBERS: Final = "members"
 CONF_ENTITIES: Final = "entities"
 CONF_ROUTES: Final = "capability_routes"
+CONF_APP_PREFERENCES: Final = "app_preferences"
+CONF_DELAYS: Final = "command_delays"
+CONF_ACTIVITIES: Final = "activities"
+CONF_WOL: Final = "wake_on_lan"
+CONF_APP_KEY: Final = "app_key"
+CONF_DISPLAY_NAME: Final = "display_name"
+CONF_VISIBLE: Final = "visible"
+CONF_FAVORITE: Final = "favorite"
+CONF_ORDER: Final = "order"
+CONF_ACTIVITY_ID: Final = "activity_id"
+CONF_ACTIVITY_NAME: Final = "activity_name"
+CONF_ACTIVITY_SOURCE: Final = "activity_source"
+CONF_ACTIVITY_VOLUME: Final = "activity_volume"
+CONF_ACTIVITY_MUTE: Final = "activity_mute"
+CONF_MAC: Final = "mac"
+CONF_BROADCAST_ADDRESS: Final = "broadcast_address"
+CONF_BROADCAST_PORT: Final = "broadcast_port"
+CONF_POWER_DELAY: Final = "power_delay"
+CONF_CAST_EXIT_DELAY: Final = "cast_exit_delay"
+CONF_APP_CONFIRM_DELAY: Final = "app_confirm_delay"
+CONF_RETRY_DELAY: Final = "retry_delay"
+CONF_RESTART_DELAY: Final = "restart_delay"
 
 ROUTE_POWER: Final = "power"
 ROUTE_VOLUME: Final = "volume"
@@ -49,6 +73,14 @@ ROUTE_KEYS: Final[tuple[str, ...]] = (
     ROUTE_RESTART,
 )
 
+DEFAULT_DELAYS: Final[dict[str, float]] = {
+    CONF_POWER_DELAY: 0.8,
+    CONF_CAST_EXIT_DELAY: 0.75,
+    CONF_APP_CONFIRM_DELAY: 1.25,
+    CONF_RETRY_DELAY: 0.5,
+    CONF_RESTART_DELAY: 2.0,
+}
+
 UID_VERSION: Final = "v7"
 UID_SEPARATOR: Final = "|"
 KIND_STATE: Final = "state"
@@ -68,11 +100,13 @@ SERVICE_REGISTER_TV_APP: Final = "register_tv_app"
 SERVICE_SEND_COMMAND: Final = "send_command"
 SERVICE_SEEK_RELATIVE: Final = "seek_relative"
 SERVICE_RESTART_DEVICE: Final = "restart_device"
+SERVICE_RUN_ACTIVITY: Final = "run_activity"
 
 ATTR_APP_ID: Final = "app_id"
 ATTR_APP_NAME: Final = "app_name"
 ATTR_COMMAND: Final = "command"
 ATTR_SECONDS: Final = "seconds"
+ATTR_ACTIVITY: Final = "activity"
 
 TV_APP_PREFIX: Final = "TV App · "
 CAST_APP_PREFIX: Final = "Cast · "
