@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "7.0.0"
+VERSION: Final = "7.1.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -20,9 +20,34 @@ TV_PLATFORMS: Final[frozenset[str]] = frozenset(
 
 CONF_GROUPS: Final = "groups"
 CONF_GROUP_ID: Final = "group_id"
+CONF_GROUP_KEY: Final = "group_key"
 CONF_GROUP_NAME: Final = "name"
 CONF_MEMBERS: Final = "members"
 CONF_ENTITIES: Final = "entities"
+CONF_ROUTES: Final = "capability_routes"
+
+ROUTE_POWER: Final = "power"
+ROUTE_VOLUME: Final = "volume"
+ROUTE_PLAYBACK: Final = "playback"
+ROUTE_SEEK: Final = "seek"
+ROUTE_METADATA: Final = "metadata"
+ROUTE_TV_APPS: Final = "tv_apps"
+ROUTE_CAST_APPS: Final = "cast_apps"
+ROUTE_INPUTS: Final = "inputs"
+ROUTE_NAVIGATION: Final = "navigation"
+ROUTE_RESTART: Final = "restart"
+ROUTE_KEYS: Final[tuple[str, ...]] = (
+    ROUTE_POWER,
+    ROUTE_VOLUME,
+    ROUTE_PLAYBACK,
+    ROUTE_SEEK,
+    ROUTE_METADATA,
+    ROUTE_TV_APPS,
+    ROUTE_CAST_APPS,
+    ROUTE_INPUTS,
+    ROUTE_NAVIGATION,
+    ROUTE_RESTART,
+)
 
 UID_VERSION: Final = "v7"
 UID_SEPARATOR: Final = "|"
@@ -33,6 +58,7 @@ MAX_SENSOR_STATE_LENGTH: Final = 255
 
 STORAGE_VERSION: Final = 1
 STORAGE_KEY: Final = f"{DOMAIN}.runtime"
+IDENTITY_STORAGE_KEY: Final = f"{DOMAIN}.physical_identities"
 LEGACY_CAST_STORAGE_KEY: Final = f"{DOMAIN}.apps"
 LEGACY_TV_STORAGE_KEY: Final = f"{DOMAIN}.tv_apps"
 
