@@ -48,6 +48,8 @@ class AdSkipManager:
         )
         self._enabled: set[str] = set()
         self._callbacks: dict[str, set[AdSkipCallback]] = defaultdict(set)
+        self._source_unsubscribers: dict[str, CALLBACK_TYPE] = {}
+        self._group_unsubscribe: CALLBACK_TYPE | None = None
         self._task: asyncio.Task[None] | None = None
         self._save_task: asyncio.Task[None] | None = None
         self._last_attempt: dict[str, float] = {}
@@ -67,17 +69,27 @@ class AdSkipManager:
 
     @callback
     def start(self) -> None:
-        """Start the lightweight detection loop."""
+        """Start source-driven Cast detection and conditional ADB polling."""
         if self._started:
             return
         self._started = True
+        self._subscribe_groups(self.runtime.groups)
+        self._group_unsubscribe = self.runtime.async_subscribe_group_additions(
+            self._subscribe_groups
+        )
         self._task = self.hass.async_create_background_task(
-            self._async_loop(), f"{AD_SKIP_STORAGE_KEY}-loop"
+            self._async_adb_loop(), f"{AD_SKIP_STORAGE_KEY}-adb-loop"
         )
 
     async def async_stop(self) -> None:
         """Stop detection and persist enabled devices."""
         self._started = False
+        if self._group_unsubscribe is not None:
+            self._group_unsubscribe()
+            self._group_unsubscribe = None
+        for unsubscribe in self._source_unsubscribers.values():
+            unsubscribe()
+        self._source_unsubscribers.clear()
         if self._task is not None and not self._task.done():
             self._task.cancel()
             with suppress(asyncio.CancelledError):
@@ -88,6 +100,37 @@ class AdSkipManager:
                 await self._save_task
         await self._async_save()
 
+    @callback
+    def _subscribe_groups(self, groups: tuple[PhysicalGroup, ...]) -> None:
+        """Subscribe once to every native source represented by new groups."""
+        for group in groups:
+            for source_id in group.source_ids:
+                if source_id in self._source_unsubscribers:
+                    continue
+                self._source_unsubscribers[source_id] = (
+                    self.runtime.manager.async_subscribe_source(
+                        source_id,
+                        self._async_source_updated,
+                    )
+                )
+
+    @callback
+    def _async_source_updated(self, source_id, old_state, new_state) -> None:
+        """React immediately when a Cast receiver advertises SKIP_AD."""
+        group = self.runtime.group_for_source(source_id)
+        source = self.runtime.manager.get_source(source_id)
+        if (
+            group is None
+            or group.key not in self._enabled
+            or source is None
+            or not source.is_cast
+        ):
+            return
+        self.hass.async_create_task(
+            self._async_try_cast(group),
+            f"{AD_SKIP_STORAGE_KEY}-cast-{group.key}",
+        )
+
     def is_enabled(self, group_key: str) -> bool:
         return group_key in self._enabled
 
@@ -95,6 +138,8 @@ class AdSkipManager:
         """Enable or disable automatic skipping for one physical device."""
         if enabled:
             self._enabled.add(group_key)
+            if group := self.runtime.group_by_key(group_key):
+                await self._async_try_cast(group, ignore_cooldown=True)
         else:
             self._enabled.discard(group_key)
             self._last_result[group_key] = "disabled"
@@ -143,18 +188,18 @@ class AdSkipManager:
             return True
         return await self._async_try_adb(group, ignore_cooldown=True)
 
-    async def _async_loop(self) -> None:
+    async def _async_adb_loop(self) -> None:
+        """Poll Android UI only for enabled devices currently running YouTube."""
         while self._started:
+            now = time.monotonic()
             for group in tuple(self.runtime.groups):
                 if group.key not in self._enabled:
                     continue
+                if now - self._last_adb_poll.get(group.key, 0) < _ADB_POLL_INTERVAL:
+                    continue
+                self._last_adb_poll[group.key] = now
                 try:
-                    skipped = await self._async_try_cast(group)
-                    if not skipped:
-                        now = time.monotonic()
-                        if now - self._last_adb_poll.get(group.key, 0) >= _ADB_POLL_INTERVAL:
-                            self._last_adb_poll[group.key] = now
-                            await self._async_try_adb(group)
+                    await self._async_try_adb(group)
                 except Exception:  # noqa: BLE001
                     # Detection is optional and must never destabilize media control.
                     self._set_result(group.key, "detection_error")
