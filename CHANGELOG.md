@@ -1,5 +1,20 @@
 # Changelog
 
+## 7.2.0
+
+- Added a per-device application manager for renaming, hiding, favouriting, and ordering native TV and Cast applications.
+- Added stable application preference keys based on launch mechanism and package/receiver identifier.
+- Published managed application details and favourite sources through the compact controller for dashboard clients.
+- Added helper-free activity presets that can power on, select an app or input, set volume, and set mute.
+- Added the `cast_attribute_sensors.run_activity` action.
+- Added configurable command delays per physical device for power-on, Cast exit, app confirmation, app retry, and power-cycle restart.
+- Added optional Wake-on-LAN power-on fallback with detected MAC address, broadcast address, and port configuration.
+- Added a diagnostic transition event entity per physical device.
+- Added normalized power, application, input, playback, volume, and mute transition events for automations.
+- Added controller attributes for favourite sources, activity names, and the managed application catalogue.
+- Added a version 9 config-entry migration for the new event platform while preserving metadata sensors, learned apps, persistent physical identities, and existing options.
+- Added full English and Portuguese configuration for applications, timing, Wake-on-LAN, and activities.
+
 ## 7.1.0
 
 - Added persistent physical-device identities so controllers reconnect to the same integration device after native TV, Cast, ADB, or manufacturer entities are recreated.

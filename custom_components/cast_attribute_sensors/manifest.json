@@ -4,7 +4,8 @@
   "after_dependencies": [
     "androidtv",
     "androidtv_remote",
-    "cast"
+    "cast",
+    "wake_on_lan"
   ],
   "codeowners": [
     "@Togarriapa"
@@ -16,5 +17,5 @@
   "issue_tracker": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "7.1.0"
+  "version": "7.2.0"
 }

@@ -113,3 +113,22 @@ restart_device:
           domain: media_player
           integration: cast_attribute_sensors
           multiple: true
+
+run_activity:
+  name: Run activity
+  description: Power on the physical device and apply a configured app/input, volume, and mute preset.
+  fields:
+    entity_id:
+      name: Controller
+      required: true
+      selector:
+        entity:
+          domain: media_player
+          integration: cast_attribute_sensors
+          multiple: true
+    activity:
+      name: Activity
+      required: true
+      example: Movie Night
+      selector:
+        text:
