@@ -1,0 +1,31 @@
+name: Apply staged release bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-release-bundle.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v7.5.0
+          fetch-depth: 0
+      - name: Apply reviewed v7.5 source bundle
+        run: |
+          tar -xzf .release/v75_payload.tgz -C "$GITHUB_WORKSPACE"
+          rm -f .release/v75_payload.tgz .github/workflows/apply-v75.yml
+          rmdir .release 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Release v7.5.0 resilience and self-healing"
+          git push origin HEAD:release/v7.5.0
