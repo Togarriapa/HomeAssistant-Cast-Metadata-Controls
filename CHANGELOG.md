@@ -1,5 +1,19 @@
 # Changelog
 
+## 7.1.0
+
+- Added persistent physical-device identities so controllers reconnect to the same integration device after native TV, Cast, ADB, or manufacturer entities are recreated.
+- Added configurable per-capability routing for power, volume, playback, seeking, metadata, TV apps, Cast apps, inputs, navigation, and restart.
+- Added one disabled-by-default diagnostic health model to every controller and a `Controller problem` binary sensor.
+- Added Home Assistant Repairs warnings for missing explicit-group members and stale capability routes.
+- Added hot-plug controller creation for completely new independent TVs, Chromecasts, speakers, and displays without reloading existing devices.
+- Retained a controlled reload only when existing physical-device membership changes and entity-registry device assignments must be rebuilt.
+- Added physical identity, health, source-platform, source-entity, and configured-route attributes to the compact controller.
+- Ensured dynamically discovered metadata sensors resolve the physical device before entering the entity registry.
+- Added a version 8 config-entry migration that rebuilds controller and health entities while retaining learned applications and metadata sensor registrations.
+- Added full English and Portuguese configuration and Repairs translations.
+- Added documentation for the companion Unified TV Card.
+
 ## 7.0.0
 
 - Rebuilt the integration around one unified source manager and one physical-device resolver.
