@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from contextlib import suppress
 from datetime import datetime
-import time
 from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
@@ -211,11 +211,14 @@ class AdSkipManager:
             controller, media_session_id = context
             self._last_attempt[group.key] = now
 
-            def send_skip() -> None:
-                controller.send_message(
+            def send_skip(
+                cast_controller=controller,
+                session_id=media_session_id,
+            ) -> None:
+                cast_controller.send_message(
                     {
                         "type": "SKIP_AD",
-                        "mediaSessionId": media_session_id,
+                        "mediaSessionId": session_id,
                     },
                     inc_session_id=True,
                 )
