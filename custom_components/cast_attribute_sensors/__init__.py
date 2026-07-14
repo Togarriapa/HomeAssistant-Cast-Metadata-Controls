@@ -15,6 +15,8 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .ad_skip import AdSkipManager
+from .ad_skip_registry import register_manager, remove_manager
 from .const import (
     ANDROID_TV_REMOTE_DOMAIN,
     ATTR_ACTIVITY,
@@ -30,6 +32,7 @@ from .const import (
     SERVICE_RUN_ACTIVITY,
     SERVICE_SEEK_RELATIVE,
     SERVICE_SEND_COMMAND,
+    SERVICE_SKIP_AD,
     UID_VERSION,
 )
 from .identity import PhysicalIdentityStore
@@ -41,6 +44,7 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.EVENT,
+    Platform.SWITCH,
 ]
 
 
@@ -74,6 +78,7 @@ async def _async_cleanup_orphan_devices(
             "binary_sensor",
             "event",
             "media_player",
+            "switch",
         }:
             continue
         parts = entity.unique_id.split("|")
@@ -115,6 +120,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     runtime.refresh_groups()
     runtime.start_topology_watch()
     entry.runtime_data = runtime
+
+    ad_skip_manager = AdSkipManager(hass, runtime)
+    await ad_skip_manager.async_initialize()
+    register_manager(entry.entry_id, ad_skip_manager)
+    ad_skip_manager.start()
 
     async def launch_cast_app(call: ServiceCall) -> None:
         app_id = call.data[ATTR_APP_ID].strip()
@@ -203,6 +213,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for entity_id in _entity_ids(call):
             await _controller(runtime, entity_id).async_run_activity(activity)
 
+    async def skip_ad(call: ServiceCall) -> None:
+        for entity_id in _entity_ids(call):
+            controller = _controller(runtime, entity_id)
+            if not await ad_skip_manager.async_skip_now(controller.group):
+                raise ServiceValidationError(
+                    f"No positively detected skippable YouTube ad on {entity_id}"
+                )
+
     app_schema = vol.Schema(
         {
             vol.Required(ATTR_ENTITY_ID): cv.entity_ids,
@@ -283,6 +301,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             }
         ),
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SKIP_AD,
+        skip_ad,
+        schema=vol.Schema(controller_schema),
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     hass.async_create_task(
@@ -304,8 +328,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         SERVICE_SEEK_RELATIVE,
         SERVICE_RESTART_DEVICE,
         SERVICE_RUN_ACTIVITY,
+        SERVICE_SKIP_AD,
     ):
         hass.services.async_remove(DOMAIN, service)
+    if ad_skip_manager := remove_manager(entry.entry_id):
+        await ad_skip_manager.async_stop()
     await entry.runtime_data.manager.async_stop()
     await entry.runtime_data.identities.async_stop()
     return True

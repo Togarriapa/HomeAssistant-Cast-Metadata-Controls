@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "7.3.0"
+VERSION: Final = "7.4.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -91,6 +91,7 @@ MAX_SENSOR_STATE_LENGTH: Final = 255
 STORAGE_VERSION: Final = 1
 STORAGE_KEY: Final = f"{DOMAIN}.runtime"
 IDENTITY_STORAGE_KEY: Final = f"{DOMAIN}.physical_identities"
+AD_SKIP_STORAGE_KEY: Final = f"{DOMAIN}.ad_skip"
 LEGACY_CAST_STORAGE_KEY: Final = f"{DOMAIN}.apps"
 LEGACY_TV_STORAGE_KEY: Final = f"{DOMAIN}.tv_apps"
 
@@ -101,6 +102,7 @@ SERVICE_SEND_COMMAND: Final = "send_command"
 SERVICE_SEEK_RELATIVE: Final = "seek_relative"
 SERVICE_RESTART_DEVICE: Final = "restart_device"
 SERVICE_RUN_ACTIVITY: Final = "run_activity"
+SERVICE_SKIP_AD: Final = "skip_ad"
 
 ATTR_APP_ID: Final = "app_id"
 ATTR_APP_NAME: Final = "app_name"
@@ -117,6 +119,14 @@ TRANSIENT_APP_MARKERS: Final[tuple[str, ...]] = (
     "cast receiver",
     "chromecast built-in",
     "default media receiver",
+)
+
+YOUTUBE_APP_IDS: Final[frozenset[str]] = frozenset(
+    {
+        "233637DE",
+        "com.google.android.youtube.tv",
+        "com.google.android.youtube.tvkids",
+    }
 )
 
 DEFAULT_CAST_APPS: Final[dict[str, str]] = {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 7.4.0
+
+- Added an opt-in `Auto-skip YouTube ads` switch to each physical media device.
+- Added event-driven Cast ad detection using the receiver's official `SKIP_AD` capability bit.
+- Added native Android TV ADB detection using the local UI hierarchy while YouTube is active.
+- Added positive localized Skip-ad label and YouTube resource-ID detection with coordinate extraction.
+- Rechecks the foreground app immediately before any Android TV tap and never sends blind timed clicks.
+- Added the `cast_attribute_sensors.skip_ad` action for manual testing and automations.
+- Added persisted per-device enablement plus last-result, last-skip-time, and available-method diagnostics.
+- Added English and Portuguese skip-control tests, resource-ID tests, and false-positive rejection tests.
+- Rewrote the README around the unified current architecture and documented privacy/performance behaviour.
+
 ## 7.3.0
 
 - Added conservative same-room family/model matching for complementary manufacturer, Android TV Remote, Android TV ADB, and Cast representations.
