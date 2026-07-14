@@ -35,6 +35,17 @@ jobs:
         with:
           python-version: "3.13"
       - run: python -m pip install ruff pyyaml
+      - name: Capture Ruff diagnostics
+        run: |
+          ruff check custom_components tests --output-format=concise > ruff-results.txt 2>&1 || true
+          ruff check custom_components tests --fix || true
+          git diff > ruff-fixes.patch
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruff-diagnostics
+          path: |
+            ruff-results.txt
+            ruff-fixes.patch
       - run: ruff check custom_components tests
       - run: python -m compileall -q custom_components
       - run: python -m unittest discover -s tests -v
