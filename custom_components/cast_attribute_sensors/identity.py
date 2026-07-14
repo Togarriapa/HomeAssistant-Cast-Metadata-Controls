@@ -118,12 +118,12 @@ class PhysicalIdentityStore:
             return 100
         if token.startswith("connection:"):
             return 80
+        if token.startswith("device:"):
+            return 90
         if token.startswith("name-area:"):
             return 35
         if token.startswith("platform-name:"):
             return 20
-        if token.startswith("device:"):
-            return 10
         return 1
 
     def _schedule_save(self) -> None:
