@@ -17,7 +17,7 @@ _SKIP_RESOURCE_MARKERS = (
     "skipads",
     "skip_button",
 )
-_SKIP_LABELS = tuple(
+_SKIP_LABELS = frozenset(
     {
         "skip ad",
         "skip ads",
@@ -54,12 +54,11 @@ def normalize_ui_text(value: str) -> str:
 
 
 def is_youtube_attributes(attributes: Mapping[str, object]) -> bool:
-    """Return whether current media-player attributes identify YouTube."""
+    """Return whether current app/source attributes identify YouTube."""
     values = (
         attributes.get("app_id"),
         attributes.get("app_name"),
         attributes.get("source"),
-        attributes.get("media_title"),
     )
     for value in values:
         if not isinstance(value, str):
