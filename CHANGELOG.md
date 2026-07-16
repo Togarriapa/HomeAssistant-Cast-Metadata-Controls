@@ -1,5 +1,12 @@
 # Changelog
 
+## 7.4.1
+
+- Fixed duplicate Sony BRAVIA controller devices when the native representation is exposed as `MediaRenderer` and the Android TV representation has no area assigned yet.
+- Added reciprocal, unambiguous complementary-platform matching that permits one missing area but refuses ambiguous matches involving multiple TVs.
+- Treats generic renderer labels as non-identifying and selects the meaningful BRAVIA name from the consolidated representations.
+- Added exact screenshot, ambiguity, conflicting-area, and same-platform safety regression tests.
+
 ## 7.4.0
 
 - Added an opt-in `Auto-skip YouTube ads` switch to each physical media device.

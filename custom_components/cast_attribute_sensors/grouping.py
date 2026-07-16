@@ -10,18 +10,18 @@ from typing import Any
 from .const import ANDROID_TV_ADB_DOMAIN, ANDROID_TV_REMOTE_DOMAIN, CAST_DOMAIN
 
 _STRIP_WORDS = re.compile(
-    r"\b(android|google|tv|television|remote|controller|media|player|adb|cast|"
+    r"\b(android|google|tv|television|remote|controller|media|renderer|player|adb|cast|"
     r"chromecast|built[ -]?in|smart|device)\b",
     re.IGNORECASE,
 )
 _DISPLAY_SUFFIX = re.compile(
-    r"(?:\s+(?:controller|remote|media\s+player|android\s+tv|adb|cast))+$",
+    r"(?:\s+(?:controller|remote|media\s+(?:player|renderer)|android\s+tv|adb|cast))+$",
     re.IGNORECASE,
 )
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _TOKEN = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 _GENERIC_NAMES = frozenset(
-    {"", "livingroom", "bedroom", "office", "kitchen", "room"}
+    {"", "livingroom", "bedroom", "office", "kitchen", "room", "renderer", "mediarenderer"}
 )
 _MATCH_STOPWORDS = frozenset(
     {
@@ -39,6 +39,7 @@ _MATCH_STOPWORDS = frozenset(
         "philips",
         "player",
         "remote",
+        "renderer",
         "samsung",
         "smart",
         "sony",
@@ -48,6 +49,8 @@ _MATCH_STOPWORDS = frozenset(
 _ANDROID_TV_PLATFORMS = frozenset(
     {ANDROID_TV_REMOTE_DOMAIN, ANDROID_TV_ADB_DOMAIN}
 )
+_SONY_NATIVE_PLATFORMS = frozenset({"braviatv", "sony_bravia"})
+_GENERIC_DMR_PLATFORMS = frozenset({"dlna_dmr"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +68,7 @@ class SourceSnapshot:
     is_tv: bool
     manufacturer: str | None = None
     model: str | None = None
+    device_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +94,28 @@ def normalized_device_name(name: str) -> str:
     return _NON_ALNUM.sub("", stripped)
 
 
+def _source_names(source: SourceSnapshot) -> tuple[str, ...]:
+    """Return every useful identity label exposed for one source."""
+    return tuple(
+        dict.fromkeys(
+            value.strip()
+            for value in (source.name, source.device_name, source.model)
+            if isinstance(value, str) and value.strip()
+        )
+    )
+
+
+def _normalized_names(source: SourceSnapshot) -> frozenset[str]:
+    return frozenset(
+        normalized
+        for value in _source_names(source)
+        if (normalized := normalized_device_name(value))
+        and normalized not in _GENERIC_NAMES
+    )
+
+
 def _significant_tokens(*values: str | None) -> frozenset[str]:
-    """Return distinctive model/family tokens suitable for same-room matching."""
+    """Return distinctive model/family tokens suitable for matching."""
     return frozenset(
         token
         for value in values
@@ -103,38 +127,88 @@ def _significant_tokens(*values: str | None) -> frozenset[str]:
     )
 
 
-def _same_room_family_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
-    """Match complementary TV representations with shared hardware evidence."""
-    if not first.area_id or first.area_id != second.area_id:
-        return False
+def _source_tokens(source: SourceSnapshot) -> frozenset[str]:
+    return _significant_tokens(*_source_names(source))
 
-    has_android_tv = (
-        first.platform in _ANDROID_TV_PLATFORMS
-        or second.platform in _ANDROID_TV_PLATFORMS
+
+def _areas_conflict(first: SourceSnapshot, second: SourceSnapshot) -> bool:
+    return bool(
+        first.area_id
+        and second.area_id
+        and first.area_id != second.area_id
     )
-    is_tv_cast_pair = (first.is_cast and second.is_tv) or (
+
+
+def _is_manufacturer_tv(source: SourceSnapshot) -> bool:
+    return source.is_tv and source.platform not in {
+        ANDROID_TV_REMOTE_DOMAIN,
+        ANDROID_TV_ADB_DOMAIN,
+        CAST_DOMAIN,
+    }
+
+
+def _is_sony_bravia(source: SourceSnapshot) -> bool:
+    """Recognize Sony TV sources even when the entity is only MediaRenderer."""
+    manufacturer = (source.manufacturer or "").casefold().strip()
+    generic_renderer = (
+        source.platform in _GENERIC_DMR_PLATFORMS
+        and clean_device_name(source.name).casefold().replace(" ", "")
+        == "mediarenderer"
+    )
+    return bool(
+        source.platform in _SONY_NATIVE_PLATFORMS
+        or manufacturer == "sony"
+        or "bravia" in _source_tokens(source)
+        or generic_renderer
+    )
+
+
+def _is_complementary_family_pair(
+    first: SourceSnapshot, second: SourceSnapshot
+) -> bool:
+    """Limit family-only matching to complementary representations."""
+    native_android = (
+        _is_manufacturer_tv(first)
+        and second.platform in _ANDROID_TV_PLATFORMS
+    ) or (
+        _is_manufacturer_tv(second)
+        and first.platform in _ANDROID_TV_PLATFORMS
+    )
+    tv_cast = (first.is_cast and second.is_tv) or (
         second.is_cast and first.is_tv
     )
-    is_complementary_tv_pair = first.is_tv and second.is_tv and has_android_tv
-    if not (is_tv_cast_pair or is_complementary_tv_pair):
+    return native_android or tv_cast
+
+
+def _family_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
+    """Return whether two complementary sources share family-level evidence."""
+    if _areas_conflict(first, second):
+        return False
+    if not _is_complementary_family_pair(first, second):
         return False
 
-    first_tokens = _significant_tokens(first.name, first.model)
-    second_tokens = _significant_tokens(second.name, second.model)
-    if first_tokens & second_tokens:
+    first_tokens = _source_tokens(first)
+    second_tokens = _source_tokens(second)
+    shared = first_tokens & second_tokens
+    if shared - {"bravia"}:
         return True
 
     first_manufacturer = (first.manufacturer or "").casefold().strip()
     second_manufacturer = (second.manufacturer or "").casefold().strip()
+    manufacturers_compatible = (
+        not first_manufacturer
+        or not second_manufacturer
+        or first_manufacturer == second_manufacturer
+    )
     return bool(
-        first_manufacturer
-        and first_manufacturer == second_manufacturer
-        and "bravia" in first_tokens
-        and "bravia" in second_tokens
+        manufacturers_compatible
+        and _is_sony_bravia(first)
+        and _is_sony_bravia(second)
     )
 
 
-def _strong_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
+def _identity_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
+    """Return only direct, non-ambiguous identity matches."""
     if first.device_id and first.device_id == second.device_id:
         return True
     if (
@@ -143,31 +217,64 @@ def _strong_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:
         and first.connections & second.connections
     ):
         return True
+    if _areas_conflict(first, second):
+        return False
+    return bool(_normalized_names(first) & _normalized_names(second))
 
-    first_name = normalized_device_name(first.name)
-    second_name = normalized_device_name(second.name)
-    if (
-        first_name
-        and first_name == second_name
-        and first_name not in _GENERIC_NAMES
-        and not (
-            first.area_id
-            and second.area_id
-            and first.area_id != second.area_id
-        )
-    ):
-        return True
 
-    return _same_room_family_match(first, second)
+def _clusters_family_match(
+    first: list[SourceSnapshot], second: list[SourceSnapshot]
+) -> bool:
+    """Check family evidence while rejecting conflicting known areas."""
+    areas = {
+        source.area_id
+        for source in (*first, *second)
+        if source.area_id
+    }
+    if len(areas) > 1:
+        return False
+    return any(
+        _family_match(first_source, second_source)
+        for first_source in first
+        for second_source in second
+    )
+
+
+def _merge_unambiguous_family_clusters(
+    clusters: list[list[SourceSnapshot]],
+) -> list[list[SourceSnapshot]]:
+    """Merge family matches only when each cluster has one reciprocal candidate."""
+    while True:
+        candidates: dict[int, set[int]] = {
+            index: set() for index in range(len(clusters))
+        }
+        for first_index, first_cluster in enumerate(clusters):
+            for second_index in range(first_index + 1, len(clusters)):
+                if _clusters_family_match(
+                    first_cluster, clusters[second_index]
+                ):
+                    candidates[first_index].add(second_index)
+                    candidates[second_index].add(first_index)
+
+        pair: tuple[int, int] | None = None
+        for first_index, matches in candidates.items():
+            if len(matches) != 1:
+                continue
+            second_index = next(iter(matches))
+            if candidates.get(second_index) == {first_index}:
+                pair = (min(first_index, second_index), max(first_index, second_index))
+                break
+        if pair is None:
+            return clusters
+
+        first_index, second_index = pair
+        clusters[first_index].extend(clusters[second_index])
+        del clusters[second_index]
 
 
 def _source_priority(source: SourceSnapshot) -> tuple[int, str]:
     # Manufacturer-native integrations provide the best identity and device name.
-    if source.is_tv and source.platform not in {
-        ANDROID_TV_REMOTE_DOMAIN,
-        ANDROID_TV_ADB_DOMAIN,
-        CAST_DOMAIN,
-    }:
+    if _is_manufacturer_tv(source):
         priority = 0
     elif source.platform == ANDROID_TV_REMOTE_DOMAIN:
         priority = 1
@@ -176,6 +283,20 @@ def _source_priority(source: SourceSnapshot) -> tuple[int, str]:
     else:
         priority = 3
     return priority, source.entity_id
+
+
+def _preferred_group_name(members: Iterable[SourceSnapshot]) -> str:
+    """Prefer a meaningful native hardware name, then a companion TV name."""
+    ordered = sorted(members, key=_source_priority)
+    for source in ordered:
+        for candidate in (source.device_name, source.name, source.model):
+            if not candidate:
+                continue
+            cleaned = clean_device_name(candidate)
+            normalized = normalized_device_name(cleaned)
+            if normalized and normalized not in _GENERIC_NAMES:
+                return cleaned
+    return clean_device_name(ordered[0].name)
 
 
 def _manual_groups(
@@ -199,7 +320,7 @@ def _manual_groups(
         groups.append(
             PhysicalGroup(
                 key=f"manual:{group_id}",
-                name=configured_name or clean_device_name(primary.name),
+                name=configured_name or _preferred_group_name(members),
                 source_ids=tuple(source.registry_id for source in members),
                 primary_source_id=primary.registry_id,
                 is_tv=any(source.is_tv for source in members),
@@ -226,11 +347,13 @@ def build_physical_groups(
     tv_clusters: list[list[SourceSnapshot]] = []
     for source in remaining_tv:
         for cluster in tv_clusters:
-            if any(_strong_match(source, member) for member in cluster):
+            if any(_identity_match(source, member) for member in cluster):
                 cluster.append(source)
                 break
         else:
             tv_clusters.append([source])
+
+    tv_clusters = _merge_unambiguous_family_clusters(tv_clusters)
 
     remaining_cast = [
         source
@@ -241,15 +364,26 @@ def build_physical_groups(
     for cluster in tv_clusters:
         attached_cast: list[SourceSnapshot] = []
         for cast_source in tuple(remaining_cast):
-            if any(_strong_match(cast_source, tv_source) for tv_source in cluster):
+            if any(_identity_match(cast_source, tv_source) for tv_source in cluster):
                 attached_cast.append(cast_source)
                 remaining_cast.remove(cast_source)
+                continue
+
+            family_candidates = [
+                candidate
+                for candidate in tv_clusters
+                if _clusters_family_match([cast_source], candidate)
+            ]
+            if len(family_candidates) == 1 and family_candidates[0] is cluster:
+                attached_cast.append(cast_source)
+                remaining_cast.remove(cast_source)
+
         members = tuple(sorted((*cluster, *attached_cast), key=_source_priority))
         primary = members[0]
         groups.append(
             PhysicalGroup(
                 key=f"tv:{primary.registry_id}",
-                name=clean_device_name(primary.name),
+                name=_preferred_group_name(members),
                 source_ids=tuple(source.registry_id for source in members),
                 primary_source_id=primary.registry_id,
                 is_tv=True,
@@ -261,7 +395,7 @@ def build_physical_groups(
         groups.append(
             PhysicalGroup(
                 key=f"cast:{source.registry_id}",
-                name=clean_device_name(source.name),
+                name=_preferred_group_name((source,)),
                 source_ids=(source.registry_id,),
                 primary_source_id=source.registry_id,
                 is_tv=False,
@@ -275,7 +409,7 @@ def build_physical_groups(
         groups.append(
             PhysicalGroup(
                 key=f"source:{source.registry_id}",
-                name=clean_device_name(source.name),
+                name=_preferred_group_name((source,)),
                 source_ids=(source.registry_id,),
                 primary_source_id=source.registry_id,
                 is_tv=source.is_tv,
