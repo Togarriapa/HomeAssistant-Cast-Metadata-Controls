@@ -45,6 +45,9 @@ def source(
     area_id: str | None = "living_room",
     is_cast: bool = False,
     is_tv: bool = True,
+    manufacturer: str | None = None,
+    model: str | None = None,
+    device_name: str | None = None,
 ) -> SourceSnapshot:
     return SourceSnapshot(
         registry_id=registry_id,
@@ -56,6 +59,9 @@ def source(
         area_id=area_id,
         is_cast=is_cast,
         is_tv=is_tv,
+        manufacturer=manufacturer,
+        model=model,
+        device_name=device_name,
     )
 
 
@@ -133,7 +139,59 @@ class GroupingTests(unittest.TestCase):
         self.assertEqual(set(groups[0].source_ids), {"sony", "remote"})
         self.assertNotIn("Controller", groups[0].name)
 
-    def test_family_match_requires_same_area(self) -> None:
+    def test_real_screenshot_bravia_and_media_renderer_group(self) -> None:
+        groups = build_physical_groups(
+            [
+                source(
+                    "sony",
+                    "MediaRenderer",
+                    platform="dlna_dmr",
+                    area_id="living_room",
+                ),
+                source(
+                    "remote",
+                    "BRAVIA 4K UR3",
+                    platform="androidtv_remote",
+                    area_id=None,
+                ),
+            ]
+        )
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(set(groups[0].source_ids), {"sony", "remote"})
+        self.assertEqual(groups[0].name, "BRAVIA 4K UR3")
+
+    def test_missing_area_family_match_stays_separate_when_ambiguous(self) -> None:
+        groups = build_physical_groups(
+            [
+                source(
+                    "living_sony",
+                    "MediaRenderer",
+                    platform="dlna_dmr",
+                    area_id="living_room",
+                    manufacturer="Sony",
+                    device_name="BRAVIA KE-55XH8096",
+                ),
+                source(
+                    "bedroom_sony",
+                    "MediaRenderer",
+                    platform="dlna_dmr",
+                    area_id="bedroom",
+                    manufacturer="Sony",
+                    device_name="BRAVIA KD-43X80J",
+                ),
+                source(
+                    "remote",
+                    "BRAVIA 4K UR3",
+                    platform="androidtv_remote",
+                    area_id=None,
+                    manufacturer="Sony",
+                    device_name="BRAVIA 4K UR3",
+                ),
+            ]
+        )
+        self.assertEqual(len(groups), 3)
+
+    def test_family_match_rejects_conflicting_known_areas(self) -> None:
         groups = build_physical_groups(
             [
                 source(
@@ -147,6 +205,25 @@ class GroupingTests(unittest.TestCase):
                     "BRAVIA 4K GB ATV3",
                     platform="androidtv_remote",
                     area_id="bedroom",
+                ),
+            ]
+        )
+        self.assertEqual(len(groups), 2)
+
+    def test_two_bravia_sources_on_same_platform_remain_separate(self) -> None:
+        groups = build_physical_groups(
+            [
+                source(
+                    "sony_a",
+                    "MediaRenderer",
+                    platform="braviatv",
+                    device_name="BRAVIA KE-55XH8096",
+                ),
+                source(
+                    "sony_b",
+                    "MediaRenderer",
+                    platform="braviatv",
+                    device_name="BRAVIA KD-43X80J",
                 ),
             ]
         )
