@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.4.2
+
+- Automatically merges one Sony-native BRAVIA representation with one generic Sony DLNA `MediaRenderer` representation when the match is reciprocal and unambiguous.
+- Keeps conflicting-area and multi-TV ambiguity safeguards, preventing unrelated televisions from being combined.
+- Makes **Merge representations of the same physical device** the first and clearest option in the integration Configure menu.
+- Documents selecting the BRAVIA, MediaRenderer, Android TV Remote, ADB, and built-in Cast entities that belong to one physical TV.
+- Clarifies that the integration-owned Controller entity must not be selected as a native source.
+- Adds English and Portuguese configuration guidance plus targeted Sony native/DLNA regression tests.
+
 ## 7.4.1
 
 - Fixed duplicate Sony BRAVIA controller devices when the native representation is exposed as `MediaRenderer` and the Android TV representation has no area assigned yet.
@@ -77,31 +86,3 @@
 - Added integration-local Home Assistant/HACS brand assets and updated README artwork.
 - Consolidated validation into HACS, hassfest, Ruff, compilation, JSON/YAML validation, and unit tests.
 - Standardized the release workflow and repository documentation.
-
-## 6.0.0
-
-- Added versioned GitHub releases and v6 controller migration.
-- Consolidated matched TV, ADB, Remote, and Cast entities.
-- Added runtime app learning and local brand assets.
-
-## 5.0.0
-
-- Added device matching using registry IDs, network connections, areas, and normalized names.
-- Reclassified the integration as a hub.
-
-## 4.0.0
-
-- Replaced standalone control helpers with compact media-player controllers.
-- Corrected stale-position relative seeking.
-
-## 3.0.0
-
-- Added native TV controls and Android TV Remote support.
-
-## 2.0.0
-
-- Added lazy metadata sensors and learned Cast apps.
-
-## 1.0.0
-
-- Initial metadata sensor implementation.

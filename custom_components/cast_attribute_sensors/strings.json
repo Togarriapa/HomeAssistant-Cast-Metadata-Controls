@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Cast Metadata & TV Controls",
-        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display."
+        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display. After setup, open Configure to merge native entities that represent the same physical device."
       }
     },
     "abort": {
@@ -15,11 +15,11 @@
     "step": {
       "init": {
         "title": "Controller configuration",
-        "description": "Configure physical grouping, capability routing, applications, activities, timing, and Wake-on-LAN.",
+        "description": "First review physical-device merging, then configure capability routing, applications, activities, timing, and Wake-on-LAN.",
         "menu_options": {
-          "add_group": "Combine source entities",
-          "remove_group": "Remove an explicit group",
-          "clear_groups": "Clear all explicit groups",
+          "add_group": "Merge representations of the same physical device",
+          "remove_group": "Unmerge a manually grouped device",
+          "clear_groups": "Remove all manual device merges",
           "configure_routes": "Route controller capabilities",
           "clear_routes": "Clear all capability routes",
           "manage_apps": "Manage applications",
@@ -32,22 +32,23 @@
         }
       },
       "add_group": {
-        "title": "Combine source entities",
-        "description": "Select every native media_player entity that represents the same physical television.",
+        "title": "Merge representations of the same physical device",
+        "description": "Select every native media_player entity that belongs to one physical television. For example, select its Sony BRAVIA, MediaRenderer, Android TV Remote, ADB, and built-in Cast entities together. Do not select the Controller entity created by this integration. Saving reloads the integration and consolidates the duplicate devices.",
         "data": {
-          "name": "Device name",
-          "entities": "Source entities"
+          "name": "Final physical device name",
+          "entities": "Native source entities"
         }
       },
       "remove_group": {
-        "title": "Remove an explicit group",
+        "title": "Unmerge a manually grouped device",
+        "description": "Remove a manual merge and return these source entities to automatic physical-device matching.",
         "data": {
-          "group_id": "Group"
+          "group_id": "Merged physical device"
         }
       },
       "clear_groups": {
-        "title": "Clear all explicit groups",
-        "description": "Automatic grouping will be used after the integration reloads.",
+        "title": "Remove all manual device merges",
+        "description": "All source entities will return to automatic physical-device matching after the integration reloads.",
         "data": {
           "confirm": "Confirm"
         }
@@ -178,7 +179,7 @@
       }
     },
     "error": {
-      "two_entities_required": "Select at least two different source entities."
+      "two_entities_required": "Select at least two different native source entities."
     },
     "abort": {
       "group_not_found": "The selected physical device is no longer available."

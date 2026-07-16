@@ -147,19 +147,40 @@ def _is_manufacturer_tv(source: SourceSnapshot) -> bool:
     }
 
 
+def _is_generic_renderer(source: SourceSnapshot) -> bool:
+    """Return whether a source is a generic DLNA MediaRenderer representation."""
+    return bool(
+        source.platform in _GENERIC_DMR_PLATFORMS
+        and normalized_device_name(source.name) in _GENERIC_NAMES
+    )
+
+
 def _is_sony_bravia(source: SourceSnapshot) -> bool:
     """Recognize Sony TV sources even when the entity is only MediaRenderer."""
     manufacturer = (source.manufacturer or "").casefold().strip()
-    generic_renderer = (
-        source.platform in _GENERIC_DMR_PLATFORMS
-        and clean_device_name(source.name).casefold().replace(" ", "")
-        == "mediarenderer"
-    )
     return bool(
         source.platform in _SONY_NATIVE_PLATFORMS
         or manufacturer == "sony"
         or "bravia" in _source_tokens(source)
-        or generic_renderer
+        or _is_generic_renderer(source)
+    )
+
+
+def _is_sony_renderer_pair(
+    first: SourceSnapshot, second: SourceSnapshot
+) -> bool:
+    """Match one Sony TV representation with one generic renderer safely."""
+    return bool(
+        (
+            _is_generic_renderer(first)
+            and second.platform not in _GENERIC_DMR_PLATFORMS
+            and _is_sony_bravia(second)
+        )
+        or (
+            _is_generic_renderer(second)
+            and first.platform not in _GENERIC_DMR_PLATFORMS
+            and _is_sony_bravia(first)
+        )
     )
 
 
@@ -177,7 +198,7 @@ def _is_complementary_family_pair(
     tv_cast = (first.is_cast and second.is_tv) or (
         second.is_cast and first.is_tv
     )
-    return native_android or tv_cast
+    return native_android or tv_cast or _is_sony_renderer_pair(first, second)
 
 
 def _family_match(first: SourceSnapshot, second: SourceSnapshot) -> bool:

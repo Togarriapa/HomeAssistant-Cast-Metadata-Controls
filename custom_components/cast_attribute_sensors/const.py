@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "7.4.1"
+VERSION: Final = "7.4.2"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -118,7 +118,6 @@ TRANSIENT_APP_MARKERS: Final[tuple[str, ...]] = (
     "ready to cast",
     "cast receiver",
     "chromecast built-in",
-    "default media receiver",
 )
 
 YOUTUBE_APP_IDS: Final[frozenset[str]] = frozenset(
