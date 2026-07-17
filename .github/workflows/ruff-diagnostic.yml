@@ -1,0 +1,31 @@
+name: Ruff diagnostic
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install ruff
+      - name: Capture Ruff findings and auto-fix patch
+        run: |
+          set +e
+          ruff check custom_components tests > ruff-report.txt 2>&1
+          ruff check --fix custom_components tests >/dev/null 2>&1
+          git diff -- . ':!.github/workflows/ruff-diagnostic.yml' > ruff-fixes.patch
+          set -e
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ruff-v8-diagnostic
+          path: |
+            ruff-report.txt
+            ruff-fixes.patch
