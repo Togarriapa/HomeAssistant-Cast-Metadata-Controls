@@ -6,9 +6,16 @@ on:
       - main
     paths:
       - custom_components/cast_attribute_sensors/manifest.json
+      - custom_components/cast_attribute_sensors/const.py
       - CHANGELOG.md
       - .github/workflows/release.yml
+  schedule:
+    - cron: "23 3 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: publish-cast-metadata-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -20,37 +27,87 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Read integration version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Verify version consistency
         id: version
         run: |
-          version="$(python - <<'PY'
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import ast
           import json
+          import re
           from pathlib import Path
-          print(json.loads(Path('custom_components/cast_attribute_sensors/manifest.json').read_text())['version'])
+
+          manifest = json.loads(
+              Path("custom_components/cast_attribute_sensors/manifest.json").read_text()
+          )
+          module = ast.parse(
+              Path("custom_components/cast_attribute_sensors/const.py").read_text()
+          )
+          const_version = next(
+              node.value.value
+              for node in module.body
+              if isinstance(node, ast.AnnAssign)
+              and getattr(node.target, "id", None) == "VERSION"
+              and isinstance(node.value, ast.Constant)
+          )
+          manifest_version = manifest["version"]
+          changelog = Path("CHANGELOG.md").read_text()
+          heading = re.search(r"^## ([0-9]+\.[0-9]+\.[0-9]+)$", changelog, re.M)
+          if heading is None:
+              raise SystemExit("CHANGELOG.md has no semantic-version heading")
+          changelog_version = heading.group(1)
+          if len({manifest_version, const_version, changelog_version}) != 1:
+              raise SystemExit(
+                  "Version mismatch: "
+                  f"manifest={manifest_version}, const={const_version}, "
+                  f"changelog={changelog_version}"
+              )
+          print(f"version={manifest_version}")
+          print(f"tag=v{manifest_version}")
           PY
-          )"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
-      - name: Publish version when missing
+
+      - name: Publish or repair GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists."
+            echo "Release $TAG already exists; normalizing it as a full release."
+            gh release edit "$TAG" --draft=false --prerelease=false \
+              --title "Cast Metadata & TV Controls $VERSION"
+            gh release view "$TAG" --json tagName,isDraft,isPrerelease,publishedAt
             exit 0
           fi
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Cast Metadata & TV Controls $VERSION"
-          git push origin "$TAG"
+
+          if ! git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+            git tag -a "$TAG" -m "Cast Metadata & TV Controls $VERSION"
+            git push origin "$TAG"
+          fi
+
           awk -v version="$VERSION" '
             $0 == "## " version {flag=1; next}
             /^## / && flag {exit}
             flag
           ' CHANGELOG.md > release-notes.md
+
+          if [[ ! -s release-notes.md ]]; then
+            printf 'Cast Metadata & TV Controls %s\n' "$VERSION" > release-notes.md
+          fi
+
           gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --title "Cast Metadata & TV Controls $VERSION" \
             --notes-file release-notes.md \
             --verify-tag
+
+          gh release view "$TAG" --json tagName,isDraft,isPrerelease,publishedAt
