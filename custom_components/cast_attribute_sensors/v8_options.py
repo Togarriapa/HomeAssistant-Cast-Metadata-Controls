@@ -11,17 +11,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_ACTIVITIES,
-    CONF_APP_PREFERENCES,
     CONF_DELAYS,
     CONF_ENTITIES,
     CONF_GROUP_ID,
-    CONF_GROUP_KEY,
     CONF_GROUP_KEYS,
     CONF_GROUP_NAME,
     CONF_GROUPS,
     CONF_MEMBERS,
-    CONF_ROUTES,
     CONF_WOL,
     DOMAIN,
     MEDIA_PLAYER_DOMAIN,
