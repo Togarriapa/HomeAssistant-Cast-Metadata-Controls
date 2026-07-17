@@ -1,5 +1,15 @@
 # Changelog
 
+## 8.1.0
+
+- Fixed the remaining duplicate-device case by passing the real Home Assistant device manufacturer, model, hardware name, connections, and area into the physical-device matcher.
+- Added native TV classification for Android/Google TV, Sony BRAVIA, Samsung, LG webOS, Panasonic, Philips, and conservatively identified Sony DLNA MediaRenderer entities.
+- Added post-reload entity-registry reconciliation so controller, health, event, ad-skip, and all enabled or disabled metadata sensor entities are moved onto the surviving unified physical device.
+- Stale generated entities and empty integration-owned devices are now removed after a merge, preventing old controller devices from remaining visible because a disabled metadata sensor was still assigned to them.
+- Kept the first-class **Merge duplicate physical devices** and advanced source-entity merge workflows introduced in 8.0.0.
+- Published a new semantic version instead of reusing the 8.0.0 tag, giving HACS and Home Assistant a real update transition to discover.
+- Retained the v7 entity unique-ID namespace and all existing v8 configuration migrations for dashboard and automation compatibility.
+
 ## 8.0.0
 
 - Added a first-class **Merge duplicate physical devices** wizard that works with the integration-owned controller devices shown in Home Assistant instead of requiring users to identify low-level source entities.
