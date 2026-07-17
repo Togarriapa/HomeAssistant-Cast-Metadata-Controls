@@ -1,33 +1,230 @@
 {
   "title": "Cast Metadata & TV Controls",
-  "config": {"step": {"user": {"title": "Cast Metadata & TV Controls", "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display."}}, "abort": {"already_configured": "Cast Metadata & TV Controls is already configured."}},
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cast Metadata & TV Controls",
+        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display. Use Configure after setup to review and merge duplicate physical-device representations."
+      }
+    },
+    "abort": {
+      "already_configured": "Cast Metadata & TV Controls is already configured."
+    }
+  },
   "options": {
     "step": {
-      "init": {"title": "Controller configuration", "description": "Configure physical grouping, capability routing, applications, activities, timing, and Wake-on-LAN.", "menu_options": {"add_group": "Combine source entities", "remove_group": "Remove an explicit group", "clear_groups": "Clear all explicit groups", "configure_routes": "Route controller capabilities", "clear_routes": "Clear all capability routes", "manage_apps": "Manage applications", "clear_app_preferences": "Clear all app preferences", "configure_timing": "Configure command timing", "configure_wol": "Configure Wake-on-LAN", "add_activity": "Add or replace an activity", "remove_activity": "Remove an activity", "clear_activities": "Clear all activities"}},
-      "add_group": {"title": "Combine source entities", "description": "Select every native media_player entity that represents the same physical television.", "data": {"name": "Device name", "entities": "Source entities"}},
-      "remove_group": {"title": "Remove an explicit group", "data": {"group_id": "Group"}},
-      "clear_groups": {"title": "Clear all explicit groups", "description": "Automatic grouping will be used after the integration reloads.", "data": {"confirm": "Confirm"}},
-      "configure_routes": {"title": "Route controller capabilities", "description": "Choose the physical controller to configure.", "data": {"group_key": "Physical device"}},
-      "route_group": {"title": "Capability routing for {name}", "description": "Automatic is recommended. Select a specific native entity only when one integration is more reliable for that capability.", "data": {"power": "Power", "volume": "Volume and mute", "playback": "Playback", "seek": "Seeking", "metadata": "Media metadata", "tv_apps": "Native TV applications", "cast_apps": "Cast applications", "inputs": "Physical inputs", "navigation": "Remote navigation", "restart": "Restart"}},
-      "clear_routes": {"title": "Clear all capability routes", "description": "Every controller will return to automatic source selection.", "data": {"confirm": "Confirm"}},
-      "manage_apps": {"title": "Manage applications", "description": "Choose a physical controller.", "data": {"group_key": "Physical device"}},
-      "choose_app": {"title": "Choose an application", "description": "Select an automatically discovered, learned, or registered application.", "data": {"app_key": "Application"}},
-      "edit_app": {"title": "Application preferences", "description": "Rename, hide, favourite, or reorder this application. Clear all custom values to return to automatic behaviour.", "data": {"display_name": "Custom display name", "visible": "Visible", "favorite": "Favourite", "order": "Order"}},
-      "clear_app_preferences": {"title": "Clear all app preferences", "description": "Restore automatic names, visibility, favourites, and ordering.", "data": {"confirm": "Confirm"}},
-      "configure_timing": {"title": "Configure command timing", "description": "Choose a physical controller.", "data": {"group_key": "Physical device"}},
-      "timing_group": {"title": "Command timing", "description": "Increase delays only when the television is slow to leave Cast, confirm an app, or restart.", "data": {"power_delay": "Delay after power on", "cast_exit_delay": "Delay after leaving Cast", "app_confirm_delay": "App confirmation delay", "retry_delay": "App retry delay", "restart_delay": "Power-cycle restart delay"}},
-      "configure_wol": {"title": "Configure Wake-on-LAN", "description": "Choose a physical controller.", "data": {"group_key": "Physical device"}},
-      "wol_group": {"title": "Wake-on-LAN", "description": "Used only when no native power-on capability is available. Clear the MAC address to disable it.", "data": {"mac": "MAC address", "broadcast_address": "Broadcast address", "broadcast_port": "Broadcast port"}},
-      "add_activity": {"title": "Add or replace an activity", "description": "Choose a physical controller.", "data": {"group_key": "Physical device"}},
-      "activity_group": {"title": "Activity preset", "description": "An activity powers on the device and can select an app/input, set volume, and set mute. Reusing a name replaces the existing activity.", "data": {"activity_name": "Activity name", "activity_source": "Application or input", "activity_volume": "Volume (-1 keeps current)", "activity_mute": "Mute state"}},
-      "remove_activity": {"title": "Remove an activity", "data": {"activity_id": "Activity"}},
-      "clear_activities": {"title": "Clear all activities", "data": {"confirm": "Confirm"}}
+      "init": {
+        "title": "Controller configuration",
+        "description": "Review physical devices first. You can merge duplicate controller devices directly, edit existing merges, or use the advanced native-source editor.",
+        "menu_options": {
+          "review_groups": "Review detected physical devices",
+          "merge_devices": "Merge duplicate physical devices",
+          "merge_sources": "Advanced: merge native source entities",
+          "edit_group": "Edit a merged physical device",
+          "remove_group": "Unmerge a physical device",
+          "clear_groups": "Remove all manual device merges",
+          "configure_routes": "Route controller capabilities",
+          "clear_routes": "Clear all capability routes",
+          "manage_apps": "Manage applications",
+          "clear_app_preferences": "Clear all app preferences",
+          "configure_timing": "Configure command timing",
+          "configure_wol": "Configure Wake-on-LAN",
+          "add_activity": "Add or replace an activity",
+          "remove_activity": "Remove an activity",
+          "clear_activities": "Clear all activities"
+        }
+      },
+      "review_groups": {
+        "title": "Detected physical devices",
+        "description": "The integration currently sees these controller devices and their native source entities:\n\n{groups}\n\nIf two entries are the same television, return to the previous menu and choose **Merge duplicate physical devices**."
+      },
+      "merge_devices": {
+        "title": "Merge duplicate physical devices",
+        "description": "Select two or more controller devices that are actually the same television. The integration combines all underlying BRAVIA, MediaRenderer, Android TV Remote, ADB, Cast, and manufacturer entities, migrates their routes/apps/activities, reloads, and removes the obsolete duplicate devices.",
+        "data": {
+          "name": "Final physical device name",
+          "group_keys": "Controller devices to merge"
+        }
+      },
+      "merge_sources": {
+        "title": "Advanced native-source merge",
+        "description": "Select every native media_player entity that belongs to one physical television. Do not select the Controller entity created by this integration. This is intended for unusual setups where the device-level merge wizard cannot identify all sources.",
+        "data": {
+          "name": "Final physical device name",
+          "entities": "Native source entities"
+        }
+      },
+      "edit_group": {
+        "title": "Edit a merged physical device",
+        "description": "Choose the manually merged physical device to rename or change.",
+        "data": {
+          "group_id": "Merged physical device"
+        }
+      },
+      "edit_group_members": {
+        "title": "Edit merged physical device",
+        "description": "Add or remove native source entities. At least two source entities are required. Saving reloads the integration and cleans obsolete generated devices.",
+        "data": {
+          "name": "Final physical device name",
+          "entities": "Native source entities"
+        }
+      },
+      "remove_group": {
+        "title": "Unmerge a physical device",
+        "description": "Remove a manual merge and return its native source entities to automatic physical-device matching. Group-specific routes, app preferences, activities, timing, and Wake-on-LAN settings are removed.",
+        "data": {
+          "group_id": "Merged physical device"
+        }
+      },
+      "clear_groups": {
+        "title": "Remove all manual device merges",
+        "description": "All native source entities return to automatic matching after reload. Settings attached to manual groups are removed.",
+        "data": {
+          "confirm": "Confirm"
+        }
+      },
+      "configure_routes": {
+        "title": "Route controller capabilities",
+        "description": "Choose the physical controller to configure.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "route_group": {
+        "title": "Capability routing for {name}",
+        "description": "Automatic is recommended. Select a specific native entity only when one integration is more reliable for that capability.",
+        "data": {
+          "power": "Power",
+          "volume": "Volume and mute",
+          "playback": "Playback",
+          "seek": "Seeking",
+          "metadata": "Media metadata",
+          "tv_apps": "Native TV applications",
+          "cast_apps": "Cast applications",
+          "inputs": "Physical inputs",
+          "navigation": "Remote navigation",
+          "restart": "Restart"
+        }
+      },
+      "clear_routes": {
+        "title": "Clear all capability routes",
+        "description": "Every controller will return to automatic source selection.",
+        "data": {
+          "confirm": "Confirm"
+        }
+      },
+      "manage_apps": {
+        "title": "Manage applications",
+        "description": "Choose a physical controller.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "choose_app": {
+        "title": "Choose an application",
+        "description": "Select an automatically discovered, learned, or registered application.",
+        "data": {
+          "app_key": "Application"
+        }
+      },
+      "edit_app": {
+        "title": "Application preferences",
+        "description": "Rename, hide, favourite, or reorder this application. Clear all custom values to return to automatic behaviour.",
+        "data": {
+          "display_name": "Custom display name",
+          "visible": "Visible",
+          "favorite": "Favourite",
+          "order": "Order"
+        }
+      },
+      "clear_app_preferences": {
+        "title": "Clear all app preferences",
+        "description": "Restore automatic names, visibility, favourites, and ordering.",
+        "data": {
+          "confirm": "Confirm"
+        }
+      },
+      "configure_timing": {
+        "title": "Configure command timing",
+        "description": "Choose a physical controller.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "timing_group": {
+        "title": "Command timing",
+        "description": "Increase delays only when the television is slow to leave Cast, confirm an app, or restart.",
+        "data": {
+          "power_delay": "Delay after power on",
+          "cast_exit_delay": "Delay after leaving Cast",
+          "app_confirm_delay": "App confirmation delay",
+          "retry_delay": "App retry delay",
+          "restart_delay": "Power-cycle restart delay"
+        }
+      },
+      "configure_wol": {
+        "title": "Configure Wake-on-LAN",
+        "description": "Choose a physical controller.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "wol_group": {
+        "title": "Wake-on-LAN",
+        "description": "Used only when no native power-on capability is available. Clear the MAC address to disable it.",
+        "data": {
+          "mac": "MAC address",
+          "broadcast_address": "Broadcast address",
+          "broadcast_port": "Broadcast port"
+        }
+      },
+      "add_activity": {
+        "title": "Add or replace an activity",
+        "description": "Choose a physical controller.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "activity_group": {
+        "title": "Activity preset",
+        "description": "An activity powers on the device and can select an app/input, set volume, and set mute. Reusing a name replaces the existing activity.",
+        "data": {
+          "activity_name": "Activity name",
+          "activity_source": "Application or input",
+          "activity_volume": "Volume (-1 keeps current)",
+          "activity_mute": "Mute state"
+        }
+      },
+      "remove_activity": {
+        "title": "Remove an activity",
+        "data": {
+          "activity_id": "Activity"
+        }
+      },
+      "clear_activities": {
+        "title": "Clear all activities",
+        "data": {
+          "confirm": "Confirm"
+        }
+      }
     },
-    "error": {"two_entities_required": "Select at least two different source entities."},
-    "abort": {"group_not_found": "The selected physical device is no longer available."}
+    "error": {
+      "two_devices_required": "Select at least two different controller devices.",
+      "two_entities_required": "Select at least two different native source entities."
+    },
+    "abort": {
+      "group_not_found": "The selected physical device is no longer available.",
+      "not_enough_devices": "Only one physical device is currently detected, so there is nothing to merge."
+    }
   },
   "issues": {
-    "group_members_missing": {"title": "Source entities are missing from {name}", "description": "The explicit physical-device group {name} has {count} missing source entities. Open the integration configuration and recreate or remove the group."},
-    "route_source_missing": {"title": "Capability routes are stale for {name}", "description": "The following routed capabilities reference source entities that no longer exist: {capabilities}. Open the integration configuration and return them to Automatic or select replacement entities."}
+    "group_members_missing": {
+      "title": "Source entities are missing from {name}",
+      "description": "The explicit physical-device group {name} has {count} missing source entities. Open the integration configuration and edit or remove the merged device."
+    },
+    "route_source_missing": {
+      "title": "Capability routes are stale for {name}",
+      "description": "The following routed capabilities reference source entities that no longer exist: {capabilities}. Open the integration configuration and return them to Automatic or select replacement entities."
+    }
   }
 }

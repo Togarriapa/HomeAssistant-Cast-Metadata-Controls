@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "7.4.2"
+VERSION: Final = "8.0.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -23,6 +23,7 @@ TV_PLATFORMS: Final[frozenset[str]] = frozenset(
 CONF_GROUPS: Final = "groups"
 CONF_GROUP_ID: Final = "group_id"
 CONF_GROUP_KEY: Final = "group_key"
+CONF_GROUP_KEYS: Final = "group_keys"
 CONF_GROUP_NAME: Final = "name"
 CONF_MEMBERS: Final = "members"
 CONF_ENTITIES: Final = "entities"
@@ -81,6 +82,7 @@ DEFAULT_DELAYS: Final[dict[str, float]] = {
     CONF_RESTART_DELAY: 2.0,
 }
 
+# Keep the v7 entity namespace so v8 upgrades preserve entity IDs and dashboards.
 UID_VERSION: Final = "v7"
 UID_SEPARATOR: Final = "|"
 KIND_STATE: Final = "state"

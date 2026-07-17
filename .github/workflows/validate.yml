@@ -38,11 +38,14 @@ jobs:
       - run: ruff check custom_components tests
       - run: python -m compileall -q custom_components
       - run: python -m unittest discover -s tests -v
-      - name: Validate JSON and YAML
+      - name: Validate versions, JSON, and YAML
         run: |
           python - <<'PY'
+          import ast
           import json
+          import re
           from pathlib import Path
+
           import yaml
 
           for path in Path('.').rglob('*.json'):
@@ -51,4 +54,28 @@ jobs:
               yaml.safe_load(path.read_text(encoding='utf-8'))
           for path in Path('.').rglob('*.yml'):
               yaml.safe_load(path.read_text(encoding='utf-8'))
+
+          manifest = json.loads(
+              Path('custom_components/cast_attribute_sensors/manifest.json').read_text()
+          )
+          module = ast.parse(
+              Path('custom_components/cast_attribute_sensors/const.py').read_text()
+          )
+          const_version = next(
+              node.value.value
+              for node in module.body
+              if isinstance(node, ast.AnnAssign)
+              and getattr(node.target, 'id', None) == 'VERSION'
+              and isinstance(node.value, ast.Constant)
+          )
+          heading = re.search(
+              r'^## ([0-9]+\.[0-9]+\.[0-9]+)$',
+              Path('CHANGELOG.md').read_text(),
+              re.M,
+          )
+          if heading is None:
+              raise SystemExit('CHANGELOG.md has no semantic-version heading')
+          versions = {manifest['version'], const_version, heading.group(1)}
+          if len(versions) != 1:
+              raise SystemExit(f'Version mismatch: {sorted(versions)}')
           PY

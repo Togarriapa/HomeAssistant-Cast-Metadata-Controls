@@ -4,7 +4,7 @@
     "step": {
       "user": {
         "title": "Cast Metadata & TV Controls",
-        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display. After setup, open Configure to merge native entities that represent the same physical device."
+        "description": "Create one organized controller device for every physical TV, Chromecast, Cast speaker, or smart display. Use Configure after setup to review and merge duplicate physical-device representations."
       }
     },
     "abort": {
@@ -15,10 +15,13 @@
     "step": {
       "init": {
         "title": "Controller configuration",
-        "description": "First review physical-device merging, then configure capability routing, applications, activities, timing, and Wake-on-LAN.",
+        "description": "Review physical devices first. You can merge duplicate controller devices directly, edit existing merges, or use the advanced native-source editor.",
         "menu_options": {
-          "add_group": "Merge representations of the same physical device",
-          "remove_group": "Unmerge a manually grouped device",
+          "review_groups": "Review detected physical devices",
+          "merge_devices": "Merge duplicate physical devices",
+          "merge_sources": "Advanced: merge native source entities",
+          "edit_group": "Edit a merged physical device",
+          "remove_group": "Unmerge a physical device",
           "clear_groups": "Remove all manual device merges",
           "configure_routes": "Route controller capabilities",
           "clear_routes": "Clear all capability routes",
@@ -31,24 +34,51 @@
           "clear_activities": "Clear all activities"
         }
       },
-      "add_group": {
-        "title": "Merge representations of the same physical device",
-        "description": "Select every native media_player entity that belongs to one physical television. For example, select its Sony BRAVIA, MediaRenderer, Android TV Remote, ADB, and built-in Cast entities together. Do not select the Controller entity created by this integration. Saving reloads the integration and consolidates the duplicate devices.",
+      "review_groups": {
+        "title": "Detected physical devices",
+        "description": "The integration currently sees these controller devices and their native source entities:\n\n{groups}\n\nIf two entries are the same television, return to the previous menu and choose **Merge duplicate physical devices**."
+      },
+      "merge_devices": {
+        "title": "Merge duplicate physical devices",
+        "description": "Select two or more controller devices that are actually the same television. The integration combines all underlying BRAVIA, MediaRenderer, Android TV Remote, ADB, Cast, and manufacturer entities, migrates their routes/apps/activities, reloads, and removes the obsolete duplicate devices.",
+        "data": {
+          "name": "Final physical device name",
+          "group_keys": "Controller devices to merge"
+        }
+      },
+      "merge_sources": {
+        "title": "Advanced native-source merge",
+        "description": "Select every native media_player entity that belongs to one physical television. Do not select the Controller entity created by this integration. This is intended for unusual setups where the device-level merge wizard cannot identify all sources.",
+        "data": {
+          "name": "Final physical device name",
+          "entities": "Native source entities"
+        }
+      },
+      "edit_group": {
+        "title": "Edit a merged physical device",
+        "description": "Choose the manually merged physical device to rename or change.",
+        "data": {
+          "group_id": "Merged physical device"
+        }
+      },
+      "edit_group_members": {
+        "title": "Edit merged physical device",
+        "description": "Add or remove native source entities. At least two source entities are required. Saving reloads the integration and cleans obsolete generated devices.",
         "data": {
           "name": "Final physical device name",
           "entities": "Native source entities"
         }
       },
       "remove_group": {
-        "title": "Unmerge a manually grouped device",
-        "description": "Remove a manual merge and return these source entities to automatic physical-device matching.",
+        "title": "Unmerge a physical device",
+        "description": "Remove a manual merge and return its native source entities to automatic physical-device matching. Group-specific routes, app preferences, activities, timing, and Wake-on-LAN settings are removed.",
         "data": {
           "group_id": "Merged physical device"
         }
       },
       "clear_groups": {
         "title": "Remove all manual device merges",
-        "description": "All source entities will return to automatic physical-device matching after the integration reloads.",
+        "description": "All native source entities return to automatic matching after reload. Settings attached to manual groups are removed.",
         "data": {
           "confirm": "Confirm"
         }
@@ -179,16 +209,18 @@
       }
     },
     "error": {
+      "two_devices_required": "Select at least two different controller devices.",
       "two_entities_required": "Select at least two different native source entities."
     },
     "abort": {
-      "group_not_found": "The selected physical device is no longer available."
+      "group_not_found": "The selected physical device is no longer available.",
+      "not_enough_devices": "Only one physical device is currently detected, so there is nothing to merge."
     }
   },
   "issues": {
     "group_members_missing": {
       "title": "Source entities are missing from {name}",
-      "description": "The explicit physical-device group {name} has {count} missing source entities. Open the integration configuration and recreate or remove the group."
+      "description": "The explicit physical-device group {name} has {count} missing source entities. Open the integration configuration and edit or remove the merged device."
     },
     "route_source_missing": {
       "title": "Capability routes are stale for {name}",
