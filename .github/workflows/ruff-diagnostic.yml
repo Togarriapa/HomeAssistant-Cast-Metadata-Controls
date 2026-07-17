@@ -1,31 +1,32 @@
-name: Ruff diagnostic
+name: Apply Ruff fix
 
 on:
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  fix:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
       - run: python -m pip install ruff
-      - name: Capture Ruff findings and auto-fix patch
+      - name: Apply exact Ruff fixes and remove this temporary workflow
         run: |
-          set +e
-          ruff check custom_components tests > ruff-report.txt 2>&1
-          ruff check --fix custom_components tests >/dev/null 2>&1
-          git diff -- . ':!.github/workflows/ruff-diagnostic.yml' > ruff-fixes.patch
-          set -e
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ruff-v8-diagnostic
-          path: |
-            ruff-report.txt
-            ruff-fixes.patch
+          set -euo pipefail
+          ruff check --fix custom_components tests
+          rm .github/workflows/ruff-diagnostic.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components tests .github/workflows/ruff-diagnostic.yml
+          git commit -m "V8: apply Ruff fixes and remove diagnostic workflow"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
