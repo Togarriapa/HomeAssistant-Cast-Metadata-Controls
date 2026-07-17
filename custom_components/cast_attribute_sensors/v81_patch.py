@@ -16,67 +16,21 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .const import CAST_DOMAIN, DOMAIN, MEDIA_PLAYER_DOMAIN, UID_VERSION
+from .device_evidence import is_native_tv
 from .grouping import SourceSnapshot
 from .runtime import IntegrationRuntime
 from .source_manager import SourceManager
 from .util import parse_sensor_unique_id
 
 _LOGGER = logging.getLogger(__name__)
-
-_NATIVE_TV_PLATFORMS = frozenset(
-    {
-        "androidtv",
-        "androidtv_remote",
-        "braviatv",
-        "panasonic_viera",
-        "philips_js",
-        "samsungtv",
-        "sony_bravia",
-        "webostv",
-    }
-)
-_DMR_PLATFORM = "dlna_dmr"
 _RECONCILE_TASKS: dict[str, asyncio.Task[None]] = {}
 _INSTALLED = False
 
 
-def _text(value: Any) -> str:
-    return str(value or "").casefold().strip()
-
-
-def _device_is_tv(
-    *,
-    platform: str,
-    registry_device_class: str | None,
-    state_device_class: str | None,
-    manufacturer: str | None,
-    model: str | None,
-    device_name: str | None,
-    friendly_name: str | None,
-) -> bool:
-    """Classify native TV entities without turning generic renderers into TVs."""
-    if platform in _NATIVE_TV_PLATFORMS:
-        return True
-    if registry_device_class == "tv" or state_device_class == "tv":
-        return True
-    if platform != _DMR_PLATFORM:
-        return False
-
-    evidence = " ".join(
-        _text(value)
-        for value in (manufacturer, model, device_name, friendly_name)
-        if value
-    )
-    return bool(
-        "bravia" in evidence
-        or "television" in evidence
-        or "sony" in evidence
-        or " tv" in f" {evidence} "
-    )
-
-
 @callback
-def _classify(self: SourceManager, entry: er.RegistryEntry) -> tuple[bool, bool] | None:
+def _classify(
+    self: SourceManager, entry: er.RegistryEntry
+) -> tuple[bool, bool] | None:
     """Classify every supported native media representation using device data."""
     if entry.domain != MEDIA_PLAYER_DOMAIN or entry.platform == DOMAIN:
         return None
@@ -93,7 +47,7 @@ def _classify(self: SourceManager, entry: er.RegistryEntry) -> tuple[bool, bool]
     state_device_class = state.attributes.get("device_class") if state else None
     friendly_name = state.attributes.get("friendly_name") if state else None
     is_cast = entry.platform == CAST_DOMAIN
-    is_tv = _device_is_tv(
+    is_tv = is_native_tv(
         platform=entry.platform,
         registry_device_class=registry_device_class,
         state_device_class=state_device_class,
