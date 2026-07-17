@@ -172,3 +172,13 @@ class PhysicalIdentityStore:
                 }
             }
         )
+
+
+def _install_runtime_hardening() -> None:
+    """Load V8.1 patches after the identity class is available."""
+    from .v81_patch import install_v81_patches
+
+    install_v81_patches()
+
+
+_install_runtime_hardening()
