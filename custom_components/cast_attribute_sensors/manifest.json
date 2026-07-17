@@ -17,5 +17,5 @@
   "issue_tracker": "https://github.com/Togarriapa/HomeAssistant-Cast-Metadata-Controls/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "7.4.2"
+  "version": "8.0.0"
 }
