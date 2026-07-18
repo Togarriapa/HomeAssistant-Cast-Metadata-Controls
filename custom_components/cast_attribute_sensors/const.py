@@ -4,7 +4,7 @@ from typing import Final
 
 DOMAIN: Final = "cast_attribute_sensors"
 NAME: Final = "Cast Metadata & TV Controls"
-VERSION: Final = "8.2.0"
+VERSION: Final = "8.3.0"
 
 CAST_DOMAIN: Final = "cast"
 ANDROID_TV_REMOTE_DOMAIN: Final = "androidtv_remote"
@@ -32,6 +32,9 @@ CONF_APP_PREFERENCES: Final = "app_preferences"
 CONF_DELAYS: Final = "command_delays"
 CONF_ACTIVITIES: Final = "activities"
 CONF_WOL: Final = "wake_on_lan"
+CONF_REMOTE_CONTROLS: Final = "remote_controls"
+CONF_REMOTE_ENTITY: Final = "entity_id"
+CONF_REMOTE_PROFILE: Final = "profile"
 CONF_APP_KEY: Final = "app_key"
 CONF_DISPLAY_NAME: Final = "display_name"
 CONF_VISIBLE: Final = "visible"
