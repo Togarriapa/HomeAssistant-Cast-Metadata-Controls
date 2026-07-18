@@ -15,7 +15,7 @@
     "step": {
       "init": {
         "title": "Configuração dos controladores",
-        "description": "Comece por rever os dispositivos físicos. Pode unir diretamente controladores duplicados, editar uniões existentes ou usar o editor avançado de entidades nativas.",
+        "description": "Comece por rever os dispositivos físicos. Pode definir o inventário completo de entidades de cada dispositivo, unir duplicados e substituir fornecedores automáticos apenas quando necessário.",
         "menu_options": {
           "review_groups": "Rever dispositivos físicos detetados",
           "merge_devices": "Unir dispositivos físicos duplicados",
@@ -23,6 +23,9 @@
           "edit_group": "Editar um dispositivo físico unido",
           "remove_group": "Separar um dispositivo físico",
           "clear_groups": "Remover todas as uniões manuais",
+          "configure_device_entities": "Configurar entidades do dispositivo físico",
+          "configure_entity_providers": "Substituir fornecedores de entidades",
+          "configure_remote_commands": "Configurar comandos remotos",
           "configure_routes": "Encaminhar capacidades do controlador",
           "clear_routes": "Limpar todos os encaminhamentos",
           "manage_apps": "Gerir aplicações",
@@ -36,11 +39,11 @@
       },
       "review_groups": {
         "title": "Dispositivos físicos detetados",
-        "description": "A integração vê atualmente estes dispositivos controladores e respetivas entidades de origem nativas:\n\n{groups}\n\nSe duas entradas forem a mesma televisão, volte ao menu anterior e escolha **Unir dispositivos físicos duplicados**."
+        "description": "A integração vê atualmente estes dispositivos controladores e respetivas entidades de origem nativas:\n\n{groups}\n\nUse **Configurar entidades do dispositivo físico** para associar explicitamente todas as entidades suportadas ao mesmo dispositivo físico."
       },
       "merge_devices": {
         "title": "Unir dispositivos físicos duplicados",
-        "description": "Selecione dois ou mais dispositivos controladores que são, na realidade, a mesma televisão. A integração combina todas as entidades BRAVIA, MediaRenderer, Android TV Remote, ADB, Cast e do fabricante, migra encaminhamentos/aplicações/atividades, recarrega e remove os dispositivos duplicados obsoletos.",
+        "description": "Selecione dois ou mais dispositivos controladores que são, na realidade, a mesma televisão. A integração combina as entidades de origem, migra encaminhamentos, aplicações, atividades, entidades associadas e configuração de fornecedores, recarrega e remove duplicados obsoletos.",
         "data": {
           "name": "Nome final do dispositivo físico",
           "group_keys": "Dispositivos controladores a unir"
@@ -48,7 +51,7 @@
       },
       "merge_sources": {
         "title": "União avançada de entidades nativas",
-        "description": "Selecione todas as entidades media_player nativas que pertencem à mesma televisão física. Não selecione a entidade Controller criada por esta integração. Esta opção destina-se a configurações incomuns em que o assistente por dispositivo não identifica todas as origens.",
+        "description": "Selecione todas as entidades media_player nativas que pertencem à mesma televisão física. Não selecione a entidade Controller criada por esta integração.",
         "data": {
           "name": "Nome final do dispositivo físico",
           "entities": "Entidades de origem nativas"
@@ -71,7 +74,7 @@
       },
       "remove_group": {
         "title": "Separar um dispositivo físico",
-        "description": "Remove uma união manual e devolve as entidades nativas à deteção automática. Os encaminhamentos, preferências de aplicações, atividades, tempos e Wake-on-LAN específicos do grupo são removidos.",
+        "description": "Remove uma união manual e devolve as entidades nativas à deteção automática. Os encaminhamentos, entidades associadas, mapas de comandos, preferências de aplicações, atividades, tempos e Wake-on-LAN específicos do grupo são removidos.",
         "data": {
           "group_id": "Dispositivo físico unido"
         }
@@ -83,6 +86,57 @@
           "confirm": "Confirmar"
         }
       },
+      "configure_device_entities": {
+        "title": "Configurar entidades do dispositivo físico",
+        "description": "Escolha o controlador físico cujo inventário completo de entidades do Home Assistant pretende configurar.",
+        "data": {
+          "group_key": "Dispositivo físico"
+        }
+      },
+      "device_entities_group": {
+        "title": "Entidades pertencentes a {name}",
+        "description": "Selecione todas as entidades suportadas que representam o mesmo dispositivo físico: todos os leitores multimédia, comandos remotos e botões de reinício. A integração cria um grupo persistente e escolhe automaticamente o melhor fornecedor para cada capacidade.",
+        "data": {
+          "name": "Nome do dispositivo físico",
+          "entities": "Entidades pertencentes a este dispositivo"
+        }
+      },
+      "configure_entity_providers": {
+        "title": "Substituir fornecedores de entidades",
+        "description": "Escolha um controlador físico. A seleção automática é recomendada; só é necessário substituir quando várias entidades associadas fornecem a mesma capacidade.",
+        "data": {
+          "group_key": "Dispositivo físico"
+        }
+      },
+      "entity_provider_group": {
+        "title": "Fornecedores de entidades de {name}",
+        "description": "Mantenha Automático, exceto quando a integração não conseguir escolher inequivocamente entre as entidades configuradas para este dispositivo.",
+        "data": {
+          "navigation": "Comando de navegação",
+          "restart": "Botão de reinício"
+        }
+      },
+      "configure_remote_commands": {
+        "title": "Configurar comandos remotos",
+        "description": "Escolha o controlador físico cujos comandos lógicos precisam de valores específicos do fornecedor.",
+        "data": {
+          "group_key": "Dispositivo físico"
+        }
+      },
+      "remote_commands_group": {
+        "title": "Comandos remotos de {name}",
+        "description": "O controlador envia comandos lógicos. Mantenha os valores predefinidos se o comando associado os aceitar; caso contrário, introduza o comando exato esperado pelo fornecedor. Comandos suportados: {commands}.",
+        "data": {
+          "HOME": "Comando Início",
+          "BACK": "Comando Voltar",
+          "SETTINGS": "Comando Definições",
+          "DPAD_UP": "Comando Cima",
+          "DPAD_DOWN": "Comando Baixo",
+          "DPAD_LEFT": "Comando Esquerda",
+          "DPAD_RIGHT": "Comando Direita",
+          "DPAD_CENTER": "Comando OK / Selecionar"
+        }
+      },
       "configure_routes": {
         "title": "Encaminhar capacidades do controlador",
         "description": "Escolha o controlador físico que pretende configurar.",
@@ -92,7 +146,7 @@
       },
       "route_group": {
         "title": "Encaminhamento de capacidades para {name}",
-        "description": "Automático é recomendado. Escolha uma entidade nativa específica apenas quando uma integração for mais fiável para essa capacidade.",
+        "description": "Automático é recomendado. Escolha uma entidade media_player nativa específica apenas quando uma origem for mais fiável para essa capacidade.",
         "data": {
           "power": "Energia",
           "volume": "Volume e silêncio",
@@ -210,7 +264,8 @@
     },
     "error": {
       "two_devices_required": "Selecione pelo menos dois dispositivos controladores diferentes.",
-      "two_entities_required": "Selecione pelo menos duas entidades de origem nativas diferentes."
+      "two_entities_required": "Selecione pelo menos duas entidades de origem nativas diferentes.",
+      "media_player_required": "Selecione pelo menos uma entidade media_player suportada."
     },
     "abort": {
       "group_not_found": "O dispositivo físico selecionado já não está disponível.",
