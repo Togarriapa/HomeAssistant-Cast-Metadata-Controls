@@ -38,6 +38,10 @@ from .const import (
 from .identity import PhysicalIdentityStore
 from .runtime import IntegrationRuntime
 from .source_manager import SourceManager
+from .v81_patch import install_v81_patches
+
+# Activate the hardware-evidence, identity, and registry reconciliation layer.
+install_v81_patches()
 
 PLATFORMS: list[Platform] = [
     Platform.MEDIA_PLAYER,
@@ -151,21 +155,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         app_id = call.data[ATTR_APP_ID].strip()
         for entity_id in _entity_ids(call):
             if entity_id in runtime.controllers:
-                controller = _controller(runtime, entity_id)
-                source_id = next(
-                    (
-                        source_id
-                        for source_id in controller.group.source_ids
-                        if manager.platform(source_id) == ANDROID_TV_REMOTE_DOMAIN
-                    ),
-                    None,
-                )
+                source_ids = _controller(runtime, entity_id).group.source_ids
+                source_id = manager.android_tv_remote_source_id(source_ids)
             else:
                 source_id = manager.source_id_for_entity(entity_id)
-            if (
-                source_id is None
-                or manager.platform(source_id) != ANDROID_TV_REMOTE_DOMAIN
-            ):
+                if manager.platform(source_id) != ANDROID_TV_REMOTE_DOMAIN:
+                    source_id = manager.android_tv_remote_source_id(
+                        (source_id,) if source_id else ()
+                    )
+            if source_id is None:
                 raise ServiceValidationError(
                     f"{entity_id} has no Android TV Remote media player"
                 )
@@ -180,14 +178,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             else:
                 source_id = manager.source_id_for_entity(entity_id)
                 source_ids = (source_id,) if source_id else ()
-            remote_id = next(
-                (
-                    source_id
-                    for source_id in source_ids
-                    if manager.platform(source_id) == ANDROID_TV_REMOTE_DOMAIN
-                ),
-                None,
-            )
+            remote_id = manager.android_tv_remote_source_id(source_ids)
             if remote_id is None:
                 raise ServiceValidationError(
                     f"{entity_id} has no Android TV Remote media player"
