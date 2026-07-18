@@ -23,7 +23,11 @@ from .const import (
     ROUTE_NAVIGATION,
     ROUTE_RESTART,
 )
-from .generic_capabilities import COMMAND_LABELS, LOGICAL_COMMANDS, normalized_command_map
+from .generic_capabilities import (
+    COMMAND_LABELS,
+    LOGICAL_COMMANDS,
+    normalized_command_map,
+)
 from .merge_options import MANUAL_GROUP_PREFIX, merge_manual_group_configs
 
 _AUTOMATIC = "__automatic__"
