@@ -1,8 +1,8 @@
 """Release regressions that do not require importing Home Assistant."""
 
-from pathlib import Path
 import json
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 COMPONENT = ROOT / "custom_components" / "cast_attribute_sensors"
