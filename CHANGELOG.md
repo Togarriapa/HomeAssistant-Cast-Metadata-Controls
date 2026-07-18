@@ -1,5 +1,14 @@
 # Changelog
 
+## 8.2.0
+
+- Fixed the V8.1 hardware-evidence and registry-reconciliation layer not being activated at integration startup.
+- Added safe Android TV Remote discovery through matching config entries, devices, connections, areas, and an unambiguous single-device fallback.
+- Restored directional controls, Home, Back, Settings, native application launch, and application registration when the Android TV media player was not originally inside the physical group.
+- Added companion Android TV app discovery to the unified controller and deduplicated learned Cast receiver IDs that represent the same application.
+- Added artwork fallback across `entity_picture`, `media_image_url`, every grouped source, and the linked Android TV source.
+- Added a `remote_available` controller attribute for dashboard clients and regression checks that prevent another dormant-patch release.
+
 ## 8.1.0
 
 - Fixed the remaining duplicate-device case by passing the real Home Assistant device manufacturer, model, hardware name, connections, and area into the physical-device matcher.

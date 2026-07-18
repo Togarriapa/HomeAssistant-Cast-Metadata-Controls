@@ -503,22 +503,105 @@ class SourceManager:
         )
 
     def remote_entity_id(self, source_ids: tuple[str, ...]) -> str | None:
-        for source_id in source_ids:
-            source = self._sources.get(source_id)
+        """Resolve the Android TV remote linked to one physical TV safely."""
+        sources = [
+            source
+            for source_id in source_ids
+            if (source := self._sources.get(source_id)) is not None
+        ]
+        config_entry_ids = {
+            source.config_entry_id for source in sources if source.config_entry_id
+        }
+        device_ids = {source.device_id for source in sources if source.device_id}
+        source_devices = [
+            device
+            for device_id in device_ids
+            if (device := self.device_registry.async_get(device_id)) is not None
+        ]
+        connections = {
+            connection
+            for device in source_devices
+            for connection in device.connections
+        }
+        areas = {device.area_id for device in source_devices if device.area_id}
+
+        candidates: list[tuple[int, str]] = []
+        for entry in self.entity_registry.entities.values():
             if (
-                source is None
-                or source.platform != ANDROID_TV_REMOTE_DOMAIN
-                or source.config_entry_id is None
+                entry.domain != REMOTE_DOMAIN
+                or entry.platform != ANDROID_TV_REMOTE_DOMAIN
+                or entry.disabled_by is not None
             ):
                 continue
-            for entry in self.entity_registry.entities.values():
-                if (
-                    entry.domain == REMOTE_DOMAIN
-                    and entry.platform == ANDROID_TV_REMOTE_DOMAIN
-                    and entry.config_entry_id == source.config_entry_id
-                ):
-                    return entry.entity_id
-        return None
+            score = 0
+            if entry.device_id in device_ids:
+                score = max(score, 120)
+            if entry.config_entry_id in config_entry_ids:
+                score = max(score, 100)
+            device = (
+                self.device_registry.async_get(entry.device_id)
+                if entry.device_id is not None
+                else None
+            )
+            if device is not None and connections & set(device.connections):
+                score = max(score, 110)
+            if device is not None and device.area_id in areas:
+                score = max(score, 20)
+            candidates.append((score, entry.entity_id))
+
+        if not candidates:
+            return None
+        best_score = max(score for score, _ in candidates)
+        if best_score > 0:
+            best = [entity_id for score, entity_id in candidates if score == best_score]
+            return best[0] if len(best) == 1 else None
+        return candidates[0][1] if len(candidates) == 1 else None
+
+    def android_tv_remote_source_id(
+        self, source_ids: tuple[str, ...]
+    ) -> str | None:
+        """Resolve the companion Android TV Remote media player."""
+        direct = next(
+            (
+                source_id
+                for source_id in source_ids
+                if self.platform(source_id) == ANDROID_TV_REMOTE_DOMAIN
+            ),
+            None,
+        )
+        if direct is not None:
+            return direct
+
+        remote_entity_id = self.remote_entity_id(source_ids)
+        remote_entry = (
+            self.entity_registry.async_get(remote_entity_id)
+            if remote_entity_id is not None
+            else None
+        )
+        matches = [
+            source.registry_id
+            for source in self._sources.values()
+            if source.platform == ANDROID_TV_REMOTE_DOMAIN
+            and source.entity_id is not None
+            and remote_entry is not None
+            and (
+                source.config_entry_id == remote_entry.config_entry_id
+                or (
+                    source.device_id is not None
+                    and source.device_id == remote_entry.device_id
+                )
+            )
+        ]
+        if len(matches) == 1:
+            return matches[0]
+
+        available = [
+            source.registry_id
+            for source in self._sources.values()
+            if source.platform == ANDROID_TV_REMOTE_DOMAIN
+            and source.entity_id is not None
+        ]
+        return available[0] if len(available) == 1 else None
 
     async def send_command(self, source_ids: tuple[str, ...], command: str) -> None:
         remote_entity_id = self.remote_entity_id(source_ids)

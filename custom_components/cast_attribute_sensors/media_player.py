@@ -230,6 +230,10 @@ class UnifiedMediaController(MediaPlayerEntity):
             "favorite_sources": favorites,
             "activity_names": [str(item.get(CONF_ACTIVITY_NAME, "")).strip() for item in activities if str(item.get(CONF_ACTIVITY_NAME, "")).strip()],
             "managed_apps": self.app_catalog(),
+            "remote_available": self.runtime.manager.remote_entity_id(
+                self.group.source_ids
+            )
+            is not None,
             **details,
         }
 
@@ -375,7 +379,25 @@ class UnifiedMediaController(MediaPlayerEntity):
 
     @property
     def media_image_url(self) -> str | None:
-        return self._string_attribute("entity_picture")
+        """Return artwork from the active source, with source-level fallbacks."""
+        states = [self._active_state()]
+        states.extend(
+            self.runtime.manager.get_state(source_id)
+            for source_id in self.group.source_ids
+        )
+        companion = self.runtime.manager.android_tv_remote_source_id(
+            self.group.source_ids
+        )
+        if companion is not None:
+            states.append(self.runtime.manager.get_state(companion))
+        for state in states:
+            if state is None:
+                continue
+            for attribute in ("entity_picture", "media_image_url"):
+                value = state.attributes.get(attribute)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return None
 
     @property
     def shuffle(self) -> bool | None:
@@ -403,14 +425,20 @@ class UnifiedMediaController(MediaPlayerEntity):
     def _raw_actions(self) -> list[SourceAction]:
         actions: list[SourceAction] = []
         native_names: set[str] = set()
-        for source_id in self._category_ids(ROUTE_TV_APPS, cast=False):
+        tv_app_sources = list(self._category_ids(ROUTE_TV_APPS, cast=False))
+        companion = self.runtime.manager.android_tv_remote_source_id(
+            self.group.source_ids
+        )
+        if companion is not None and companion not in tv_app_sources:
+            tv_app_sources.append(companion)
+        for source_id in tv_app_sources:
             if self.runtime.manager.platform(source_id) != ANDROID_TV_REMOTE_DOMAIN:
                 continue
             for app_id, name in self.runtime.manager.tv_apps(source_id).items():
                 if not _is_transient_app(name):
                     actions.append(SourceAction("tv_app", source_id, app_id, _action_key("tv_app", app_id), name))
                     native_names.add(name.casefold().strip())
-        for source_id in self._category_ids(ROUTE_TV_APPS, cast=False):
+        for source_id in tv_app_sources:
             if self.runtime.manager.platform(source_id) != ANDROID_TV_ADB_DOMAIN:
                 continue
             for native_source in self.runtime.manager.sources(source_id):
@@ -423,8 +451,13 @@ class UnifiedMediaController(MediaPlayerEntity):
             for native_source in self.runtime.manager.sources(source_id):
                 if native_source.strip() and not _is_transient_app(native_source):
                     actions.append(SourceAction("input", source_id, native_source, _action_key("input", native_source), native_source))
+        cast_names: set[str] = set()
         for source_id in self._category_ids(ROUTE_CAST_APPS, cast=True):
             for app_id, name in self.runtime.manager.cast_apps(source_id).items():
+                normalized = name.casefold().strip()
+                if _is_transient_app(name) or normalized in cast_names:
+                    continue
+                cast_names.add(normalized)
                 actions.append(SourceAction("cast_app", source_id, app_id, _action_key("cast_app", app_id), name))
         return actions
 
@@ -495,7 +528,22 @@ class UnifiedMediaController(MediaPlayerEntity):
                 for option, action in actions.items():
                     if action.kind == "cast_app" and action.source_id == active_cast and action.value == app_id:
                         return option
-        for source_id in self._source_ids(cast=False):
+            app_name = state.attributes.get("app_name") if state else None
+            if isinstance(app_name, str):
+                for option, action in actions.items():
+                    if (
+                        action.kind == "cast_app"
+                        and action.source_id == active_cast
+                        and self._display_name(action).casefold() == app_name.casefold()
+                    ):
+                        return option
+        native_source_ids = list(self._source_ids(cast=False))
+        companion = self.runtime.manager.android_tv_remote_source_id(
+            self.group.source_ids
+        )
+        if companion is not None and companion not in native_source_ids:
+            native_source_ids.append(companion)
+        for source_id in native_source_ids:
             state = self.runtime.manager.get_state(source_id)
             if state is None:
                 continue
