@@ -15,7 +15,7 @@
     "step": {
       "init": {
         "title": "Controller configuration",
-        "description": "Review physical devices first. You can merge duplicate controller devices directly, edit existing merges, or use the advanced native-source editor.",
+        "description": "Review physical devices first. You can define the full entity inventory for each device, merge duplicates, and override automatic providers only when needed.",
         "menu_options": {
           "review_groups": "Review detected physical devices",
           "merge_devices": "Merge duplicate physical devices",
@@ -23,6 +23,9 @@
           "edit_group": "Edit a merged physical device",
           "remove_group": "Unmerge a physical device",
           "clear_groups": "Remove all manual device merges",
+          "configure_device_entities": "Configure physical device entities",
+          "configure_entity_providers": "Override entity providers",
+          "configure_remote_commands": "Configure remote commands",
           "configure_routes": "Route controller capabilities",
           "clear_routes": "Clear all capability routes",
           "manage_apps": "Manage applications",
@@ -36,11 +39,11 @@
       },
       "review_groups": {
         "title": "Detected physical devices",
-        "description": "The integration currently sees these controller devices and their native source entities:\n\n{groups}\n\nIf two entries are the same television, return to the previous menu and choose **Merge duplicate physical devices**."
+        "description": "The integration currently sees these controller devices and their native source entities:\n\n{groups}\n\nUse **Configure physical device entities** to explicitly associate every supported entity with the same physical device."
       },
       "merge_devices": {
         "title": "Merge duplicate physical devices",
-        "description": "Select two or more controller devices that are actually the same television. The integration combines all underlying BRAVIA, MediaRenderer, Android TV Remote, ADB, Cast, and manufacturer entities, migrates their routes/apps/activities, reloads, and removes the obsolete duplicate devices.",
+        "description": "Select two or more controller devices that are actually the same television. The integration combines their underlying source entities, migrates their routes, applications, activities, linked entities and provider configuration, reloads, and removes obsolete duplicate devices.",
         "data": {
           "name": "Final physical device name",
           "group_keys": "Controller devices to merge"
@@ -48,7 +51,7 @@
       },
       "merge_sources": {
         "title": "Advanced native-source merge",
-        "description": "Select every native media_player entity that belongs to one physical television. Do not select the Controller entity created by this integration. This is intended for unusual setups where the device-level merge wizard cannot identify all sources.",
+        "description": "Select every native media_player entity that belongs to one physical television. Do not select the Controller entity created by this integration.",
         "data": {
           "name": "Final physical device name",
           "entities": "Native source entities"
@@ -71,7 +74,7 @@
       },
       "remove_group": {
         "title": "Unmerge a physical device",
-        "description": "Remove a manual merge and return its native source entities to automatic physical-device matching. Group-specific routes, app preferences, activities, timing, and Wake-on-LAN settings are removed.",
+        "description": "Remove a manual merge and return its native source entities to automatic physical-device matching. Group-specific routes, linked entities, command maps, app preferences, activities, timing, and Wake-on-LAN settings are removed.",
         "data": {
           "group_id": "Merged physical device"
         }
@@ -83,6 +86,57 @@
           "confirm": "Confirm"
         }
       },
+      "configure_device_entities": {
+        "title": "Configure physical device entities",
+        "description": "Choose the physical controller whose complete Home Assistant entity inventory should be configured.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "device_entities_group": {
+        "title": "Entities belonging to {name}",
+        "description": "Select every supported entity that represents this same physical device: all media players, remote entities, and restart buttons. The integration creates a persistent physical-device group and automatically chooses the best provider for each capability.",
+        "data": {
+          "name": "Physical device name",
+          "entities": "Entities belonging to this physical device"
+        }
+      },
+      "configure_entity_providers": {
+        "title": "Override entity providers",
+        "description": "Choose a physical controller. Automatic selection is recommended; overrides are only needed when several linked entities can provide the same capability.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "entity_provider_group": {
+        "title": "Entity providers for {name}",
+        "description": "Select Automatic unless the integration cannot unambiguously choose among the entities configured for this physical device.",
+        "data": {
+          "navigation": "Navigation remote",
+          "restart": "Restart button"
+        }
+      },
+      "configure_remote_commands": {
+        "title": "Configure remote commands",
+        "description": "Choose a physical controller whose logical remote commands need provider-specific values.",
+        "data": {
+          "group_key": "Physical device"
+        }
+      },
+      "remote_commands_group": {
+        "title": "Remote commands for {name}",
+        "description": "The controller sends logical commands. Keep the default values when the linked remote accepts them; otherwise enter the exact command expected by that remote provider. Supported logical commands: {commands}.",
+        "data": {
+          "HOME": "Home command",
+          "BACK": "Back command",
+          "SETTINGS": "Settings command",
+          "DPAD_UP": "Up command",
+          "DPAD_DOWN": "Down command",
+          "DPAD_LEFT": "Left command",
+          "DPAD_RIGHT": "Right command",
+          "DPAD_CENTER": "OK / Select command"
+        }
+      },
       "configure_routes": {
         "title": "Route controller capabilities",
         "description": "Choose the physical controller to configure.",
@@ -92,7 +146,7 @@
       },
       "route_group": {
         "title": "Capability routing for {name}",
-        "description": "Automatic is recommended. Select a specific native entity only when one integration is more reliable for that capability.",
+        "description": "Automatic is recommended. Select a specific native media-player entity only when one source is more reliable for that capability.",
         "data": {
           "power": "Power",
           "volume": "Volume and mute",
@@ -210,7 +264,8 @@
     },
     "error": {
       "two_devices_required": "Select at least two different controller devices.",
-      "two_entities_required": "Select at least two different native source entities."
+      "two_entities_required": "Select at least two different native source entities.",
+      "media_player_required": "Select at least one supported media_player entity."
     },
     "abort": {
       "group_not_found": "The selected physical device is no longer available.",
