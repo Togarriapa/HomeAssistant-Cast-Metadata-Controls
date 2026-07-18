@@ -20,11 +20,13 @@ class V82ActivationTests(unittest.TestCase):
         self.assertIn("remote_available", player)
         self.assertIn('("entity_picture", "media_image_url")', player)
 
-    def test_release_versions_match(self) -> None:
+    def test_manifest_and_python_versions_match(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         const = (COMPONENT / "const.py").read_text()
-        self.assertEqual(manifest["version"], "8.2.0")
-        self.assertIn('VERSION: Final = "8.2.0"', const)
+        self.assertIn(
+            f'VERSION: Final = "{manifest["version"]}"',
+            const,
+        )
 
 
 if __name__ == "__main__":
