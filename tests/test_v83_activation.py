@@ -12,7 +12,7 @@ COMPONENT = ROOT / "custom_components" / "cast_attribute_sensors"
 
 class V83ActivationTests(unittest.TestCase):
     def test_runtime_patch_is_activated(self) -> None:
-        source = (COMPONENT / "__init__.py").read_text()
+        source = (COMPONENT / "ad_skip_registry.py").read_text()
         self.assertIn("install_v83_patches()", source)
 
     def test_options_patch_is_activated(self) -> None:
