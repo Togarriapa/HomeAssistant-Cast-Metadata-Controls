@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from .ad_skip import AdSkipManager
+from .v83_patch import install_v83_patches
+
+# This module is imported by the integration entry point before SourceManager is
+# instantiated, making it a reliable activation point for the V8.3 runtime layer.
+install_v83_patches()
 
 _MANAGERS: dict[str, AdSkipManager] = {}
 
