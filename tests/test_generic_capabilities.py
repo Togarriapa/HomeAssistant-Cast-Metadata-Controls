@@ -35,12 +35,27 @@ from custom_components.cast_attribute_sensors.generic_capabilities import (  # n
 
 class GenericCapabilityTests(unittest.TestCase):
     def test_physical_inputs_are_classified_generically(self) -> None:
-        for value in ("HDMI 1", "TV", "AV", "Digital Tuner", "USB"):
+        for value in (
+            "HDMI 1",
+            "HDMI 2 (ARC)",
+            "TV",
+            "TV Tuner",
+            "AV 1",
+            "Digital Tuner",
+            "USB",
+        ):
             with self.subTest(value=value):
                 self.assertEqual(source_kind(value), "input")
 
     def test_other_selectable_sources_become_native_apps(self) -> None:
-        for value in ("YouTube", "Netflix", "Plex", "Music"):
+        for value in (
+            "YouTube",
+            "YouTube TV",
+            "Apple TV",
+            "Netflix",
+            "Plex",
+            "Music",
+        ):
             with self.subTest(value=value):
                 self.assertEqual(source_kind(value), "native_source")
 
