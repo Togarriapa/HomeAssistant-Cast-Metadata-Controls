@@ -198,8 +198,10 @@ def _provider_entity_id(
     configuration = self.group_configuration(source_ids)
     linked = set(self.linked_entity_ids(source_ids))
     routed = str(configuration.get("provider_routes", {}).get(capability, ""))
-    if routed and routed in linked and self.entity_registry.async_get(routed):
-        return routed
+    if routed and routed in linked:
+        entry = self.entity_registry.async_get(routed)
+        if entry is not None and entry.disabled_by is None:
+            return routed
 
     domains = {
         ROUTE_NAVIGATION: {REMOTE_DOMAIN},
@@ -258,13 +260,16 @@ def _provider_entity_id(
 def _remote_entity_id(
     self: SourceManager, source_ids: tuple[str, ...]
 ) -> str | None:
-    return self.provider_entity_id(source_ids, ROUTE_NAVIGATION)
+    configured = self.provider_entity_id(source_ids, ROUTE_NAVIGATION)
+    if configured is not None:
+        return configured
+    return _remote_entity_id.original(self, source_ids)
 
 
 async def _send_command(
     self: SourceManager, source_ids: tuple[str, ...], command: str
 ) -> None:
-    entity_id = self.provider_entity_id(source_ids, ROUTE_NAVIGATION)
+    entity_id = self.remote_entity_id(source_ids)
     if entity_id is None:
         raise HomeAssistantError(
             "No linked remote provider is available; configure the physical device entities"
@@ -285,7 +290,10 @@ async def _send_command(
 def _restart_button_entity_id(
     self: SourceManager, source_ids: tuple[str, ...]
 ) -> str | None:
-    return self.provider_entity_id(source_ids, ROUTE_RESTART)
+    configured = self.provider_entity_id(source_ids, ROUTE_RESTART)
+    if configured is not None:
+        return configured
+    return _restart_button_entity_id.original(self, source_ids)
 
 
 def _register_controller(
@@ -299,17 +307,14 @@ def _register_controller(
         provider_routes=self.configured_provider_routes(group),
         command_map=self.configured_command_map(group),
     )
+    controller.async_write_ha_state()
 
 
 def _extra_state_attributes(self: UnifiedMediaController) -> dict[str, Any]:
     attributes = dict(_extra_state_attributes.original.fget(self))
     linked = self.runtime.configured_device_entities(self.group)
-    navigation = self.runtime.manager.provider_entity_id(
-        self.group.source_ids, ROUTE_NAVIGATION
-    )
-    restart = self.runtime.manager.provider_entity_id(
-        self.group.source_ids, ROUTE_RESTART
-    )
+    navigation = self.runtime.manager.remote_entity_id(self.group.source_ids)
+    restart = self.runtime.manager.restart_button_entity_id(self.group.source_ids)
     attributes.update(
         {
             "linked_entities": list(linked),
@@ -325,9 +330,12 @@ def _extra_state_attributes(self: UnifiedMediaController) -> dict[str, Any]:
     return attributes
 
 
+def _normalized_action_name(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def _raw_actions(self: UnifiedMediaController) -> list[SourceAction]:
     actions = list(_raw_actions.original(self))
-    existing = {(action.kind, action.source_id, action.value) for action in actions}
     generic_source_ids = [
         source_id
         for source_id in self.group.source_ids
@@ -342,12 +350,29 @@ def _raw_actions(self: UnifiedMediaController) -> list[SourceAction]:
         for action in actions
         if not (action.kind == "input" and action.source_id in generic_id_set)
     ]
+
     existing = {(action.kind, action.source_id, action.value) for action in actions}
+    existing_app_names = {
+        _normalized_action_name(action.default_name)
+        for action in actions
+        if action.kind in {"tv_app", "adb_app", "native_source"}
+    }
+    existing_input_names = {
+        _normalized_action_name(action.default_name)
+        for action in actions
+        if action.kind == "input"
+    }
+
     for source_id in generic_source_ids:
         for value in self.runtime.manager.sources(source_id):
             kind = source_kind(value)
+            normalized_name = _normalized_action_name(value)
             identity = (kind, source_id, value)
             if identity in existing:
+                continue
+            if kind == "native_source" and normalized_name in existing_app_names:
+                continue
+            if kind == "input" and normalized_name in existing_input_names:
                 continue
             key_value = value if kind == "input" else f"{source_id}:{value}"
             actions.append(
@@ -360,6 +385,10 @@ def _raw_actions(self: UnifiedMediaController) -> list[SourceAction]:
                 )
             )
             existing.add(identity)
+            if kind == "native_source":
+                existing_app_names.add(normalized_name)
+            else:
+                existing_input_names.add(normalized_name)
     return actions
 
 
@@ -421,8 +450,10 @@ def install_v83_patches() -> None:
     SourceManager._source_facts = _source_facts
     SourceManager._entry_labels = _entry_labels
     SourceManager.provider_entity_id = _provider_entity_id
+    _remote_entity_id.original = SourceManager.remote_entity_id
     SourceManager.remote_entity_id = _remote_entity_id
     SourceManager.send_command = _send_command
+    _restart_button_entity_id.original = SourceManager.restart_button_entity_id
     SourceManager.restart_button_entity_id = _restart_button_entity_id
 
     _register_controller.original = IntegrationRuntime.register_controller
