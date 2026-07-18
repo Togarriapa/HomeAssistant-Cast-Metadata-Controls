@@ -1,0 +1,154 @@
+name: Apply V8.3 universal remote release
+
+on:
+  push:
+    branches:
+      - fix/v8.3.0-universal-remote
+    paths:
+      - custom_components/cast_attribute_sensors/v83_patch.py
+      - custom_components/cast_attribute_sensors/v83_options.py
+      - custom_components/cast_attribute_sensors/universal_remote.py
+      - .github/workflows/apply-v830.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v8.3.0-universal-remote
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply release changes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          component = Path('custom_components/cast_attribute_sensors')
+
+          def replace_once(path, old, new):
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing expected text in {path}: {old!r}')
+              path.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              component / 'const.py',
+              'VERSION: Final = "8.2.0"',
+              'VERSION: Final = "8.3.0"',
+          )
+          replace_once(
+              component / 'const.py',
+              'CONF_WOL: Final = "wake_on_lan"\n',
+              'CONF_WOL: Final = "wake_on_lan"\n'
+              'CONF_REMOTE_CONTROLS: Final = "remote_controls"\n'
+              'CONF_REMOTE_ENTITY: Final = "entity_id"\n'
+              'CONF_REMOTE_PROFILE: Final = "profile"\n',
+          )
+
+          manifest_path = component / 'manifest.json'
+          manifest = json.loads(manifest_path.read_text())
+          manifest['version'] = '8.3.0'
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+
+          replace_once(
+              component / '__init__.py',
+              'from .v81_patch import install_v81_patches\n',
+              'from .v81_patch import install_v81_patches\n'
+              'from .v83_patch import install_v83_patches\n',
+          )
+          replace_once(
+              component / '__init__.py',
+              'install_v81_patches()\n',
+              'install_v81_patches()\ninstall_v83_patches()\n',
+          )
+
+          replace_once(
+              component / 'config_flow.py',
+              'from .v8_options import install_v8_options\n',
+              'from .v8_options import install_v8_options\n'
+              'from .v83_options import install_v83_options\n',
+          )
+          replace_once(
+              component / 'config_flow.py',
+              'install_v8_options(ControllerOptionsFlow)\n',
+              'install_v8_options(ControllerOptionsFlow)\n'
+              'install_v83_options(ControllerOptionsFlow)\n',
+          )
+
+          changelog_path = Path('CHANGELOG.md')
+          changelog = changelog_path.read_text()
+          heading = '# Changelog\n\n'
+          entry = '''## 8.3.0
+
+- Replaced the Android-TV-only navigation dependency with universal remote-provider routing.
+- Automatically links Sony BRAVIA, Android TV Remote, and Android TV ADB remote entities using device, config-entry, connection, area, model, and name evidence.
+- Translates Home, Back, Settings, OK, and directional commands into each provider's native command vocabulary.
+- Added **Configure remote control** so ambiguous multi-TV installations can explicitly select a remote entity and command profile.
+- Exposes the selected remote entity, platform, and profile in controller diagnostics.
+- Discovers Sony BRAVIA applications and inputs from the native source list and routes selections through the BRAVIA media player.
+- Preserves manual remote configuration when physical devices are merged or unmerged.
+- Added regression tests for Sony command translation, Android ADB translation, application/input classification, activation, and release consistency.
+
+'''
+          if '## 8.3.0\n' not in changelog:
+              changelog_path.write_text(changelog.replace(heading, heading + entry, 1))
+
+          english_steps = {
+              'configure_remote': {
+                  'title': 'Configure remote control',
+                  'description': 'Choose the physical controller whose navigation remote should be configured.',
+                  'data': {'group_key': 'Physical device'},
+              },
+              'remote_group': {
+                  'title': 'Remote control for {name}',
+                  'description': 'Automatic detection is recommended. Select a specific remote entity and profile when several television remotes exist or automatic matching is ambiguous.',
+                  'data': {
+                      'entity_id': 'Remote entity',
+                      'profile': 'Command profile',
+                  },
+              },
+          }
+          portuguese_steps = {
+              'configure_remote': {
+                  'title': 'Configurar comando remoto',
+                  'description': 'Escolha o controlador físico cujo comando de navegação pretende configurar.',
+                  'data': {'group_key': 'Dispositivo físico'},
+              },
+              'remote_group': {
+                  'title': 'Comando remoto de {name}',
+                  'description': 'A deteção automática é recomendada. Se existirem vários comandos de televisão ou a associação for ambígua, selecione explicitamente a entidade e o perfil.',
+                  'data': {
+                      'entity_id': 'Entidade de comando remoto',
+                      'profile': 'Perfil de comandos',
+                  },
+              },
+          }
+
+          for relative, steps, menu_label in (
+              ('strings.json', english_steps, 'Configure remote control'),
+              ('translations/en.json', english_steps, 'Configure remote control'),
+              ('translations/pt.json', portuguese_steps, 'Configurar comando remoto'),
+          ):
+              path = component / relative
+              data = json.loads(path.read_text())
+              options = data['options']
+              options['step']['init']['menu_options']['configure_remote'] = menu_label
+              options['step'].update(steps)
+              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+
+          Path('.github/workflows/apply-v830.yml').unlink()
+          PY
+      - name: Commit generated release changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Finalize v8.3.0 universal remote release'
+          git push origin HEAD:fix/v8.3.0-universal-remote
