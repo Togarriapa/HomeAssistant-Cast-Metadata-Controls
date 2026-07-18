@@ -1,5 +1,17 @@
 # Changelog
 
+## 8.3.0
+
+- Replaced the vendor-specific remote assumption with an explicit physical-device entity inventory.
+- Added **Configure physical device entities** so every media player, remote, and restart button belonging to one television can be selected together.
+- Added generic automatic provider selection for navigation and restart using the configured inventory, entity domain, availability, device, config entry, area, device class, and name evidence.
+- Added manual entity-provider overrides for ambiguous installations with several TVs or remotes.
+- Added a user-defined logical remote-command map, avoiding manufacturer and integration command names in the backend.
+- Added generic application/input discovery from any non-Cast media player's `source_list`; likely physical inputs remain inputs and other selectable sources appear as TV applications.
+- Exposed linked entities and selected providers in controller diagnostics.
+- Preserved linked entities, provider overrides, and command mappings across merge, edit, unmerge, and cleanup operations.
+- Added regression coverage for source classification, command passthrough, activation, and version consistency.
+
 ## 8.2.0
 
 - Fixed the V8.1 hardware-evidence and registry-reconciliation layer not being activated at integration startup.
