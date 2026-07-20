@@ -1,4 +1,4 @@
-"""Static V8.3/V8.3.1 release checks without Home Assistant imports."""
+"""Static V8.3 release checks without Home Assistant imports."""
 
 from __future__ import annotations
 
@@ -29,15 +29,17 @@ class V83ActivationTests(unittest.TestCase):
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         const = (COMPONENT / "const.py").read_text()
         changelog = (ROOT / "CHANGELOG.md").read_text()
-        self.assertEqual(manifest["version"], "8.3.1")
-        self.assertIn('VERSION: Final = "8.3.1"', const)
-        self.assertIn("## 8.3.1", changelog)
+        self.assertEqual(manifest["version"], "8.3.2")
+        self.assertIn('VERSION: Final = "8.3.2"', const)
+        self.assertIn("## 8.3.2", changelog)
 
     def test_hacs_uses_verified_zip_release(self) -> None:
         hacs = json.loads((ROOT / "hacs.json").read_text())
         workflow = (ROOT / ".github" / "workflows" / "release.yml").read_text()
         self.assertIs(hacs["zip_release"], True)
         self.assertEqual(hacs["filename"], "cast_attribute_sensors.zip")
+        self.assertIn("softprops/action-gh-release@v2", workflow)
+        self.assertIn("make_latest: true", workflow)
         self.assertIn("cmp \"$ASSET\"", workflow)
 
     def test_generic_configuration_keys_are_declared(self) -> None:
