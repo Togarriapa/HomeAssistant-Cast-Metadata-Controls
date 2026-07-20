@@ -1,0 +1,38 @@
+name: Repair v8.4 regression test
+
+on:
+  push:
+    branches:
+      - release/v8.4.0-reliable-device-setup
+    paths:
+      - .github/workflows/fix-v840-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/v8.4.0-reliable-device-setup
+      - name: Repair indentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/test_v840_release.py')
+          text = path.read_text()
+          text = text.replace('\n  (COMPONENT / name)', '\n            (COMPONENT / name)')
+          text = text.replace('\n  for name in (', '\n            for name in (')
+          text = text.replace('\n  with self.subTest', '\n            with self.subTest')
+          text = text.replace('\n      self.assertNotIn', '\n                self.assertNotIn')
+          path.write_text(text)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/test_v840_release.py
+          git commit -m 'Fix v8.4 regression test indentation'
+          git push origin HEAD:release/v8.4.0-reliable-device-setup
