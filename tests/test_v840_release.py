@@ -43,12 +43,12 @@ class V840ReleaseTests(unittest.TestCase):
 
     def test_v840_contains_no_vendor_specific_profiles(self) -> None:
         content = "\n".join(
-  (COMPONENT / name).read_text().casefold()
-  for name in ("v840_options.py", "v840_patch.py")
+            (COMPONENT / name).read_text().casefold()
+            for name in ("v840_options.py", "v840_patch.py")
         )
         for forbidden in ("bravia", "sony", "samsung", "webos", "panasonic"):
-  with self.subTest(forbidden=forbidden):
-      self.assertNotIn(forbidden, content)
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, content)
 
 
 if __name__ == "__main__":
