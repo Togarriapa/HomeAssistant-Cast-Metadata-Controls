@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -58,11 +59,12 @@ jobs:
           )
           if heading is None:
               raise SystemExit("CHANGELOG.md has no semantic-version heading")
+
           hacs = json.loads(Path("hacs.json").read_text())
           versions = {manifest["version"], const_version, heading.group(1)}
           if len(versions) != 1:
               raise SystemExit(f"Version mismatch: {sorted(versions)}")
-          if not hacs.get("zip_release"):
+          if hacs.get("zip_release") is not True:
               raise SystemExit("hacs.json must enable zip_release")
           if hacs.get("filename") != "cast_attribute_sensors.zip":
               raise SystemExit("Unexpected HACS ZIP filename")
@@ -72,6 +74,7 @@ jobs:
               for path in sorted(component.rglob("*")):
                   if path.is_file() and "__pycache__" not in path.parts:
                       archive.write(path, path.relative_to(component))
+
           with zipfile.ZipFile(asset) as archive:
               names = set(archive.namelist())
           required = {"__init__.py", "manifest.json", "const.py"}
@@ -86,22 +89,10 @@ jobs:
           print(f"asset={asset}")
           PY
 
-      - name: Publish or repair GitHub release
+      - name: Build release notes
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
-          ASSET: ${{ steps.version.outputs.asset }}
         run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
-            git tag -a "$TAG" -m "Cast Metadata & TV Controls $VERSION"
-            git push origin "$TAG"
-          fi
-
           awk -v version="$VERSION" '
             $0 == "## " version {flag=1; next}
             /^## / && flag {exit}
@@ -111,20 +102,29 @@ jobs:
             printf 'Cast Metadata & TV Controls %s\n' "$VERSION" > release-notes.md
           fi
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --prerelease=false --latest \
-              --title "Cast Metadata & TV Controls $VERSION"
-            gh release upload "$TAG" "$ASSET" --clobber
-          else
-            gh release create "$TAG" "$ASSET" \
-              --target "$GITHUB_SHA" \
-              --title "Cast Metadata & TV Controls $VERSION" \
-              --notes-file release-notes.md \
-              --verify-tag \
-              --latest
-          fi
+      - name: Create or repair latest GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Cast Metadata & TV Controls ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: ${{ steps.version.outputs.asset }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: true
 
-          test "$(gh release view "$TAG" --json assets --jq '.assets[] | select(.name == env.ASSET) | .name')" = "$ASSET"
+      - name: Verify published release and HACS asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ASSET: ${{ steps.version.outputs.asset }}
+        run: |
+          set -euo pipefail
+          test "$(gh release view "$TAG" --json isDraft --jq '.isDraft')" = "false"
+          test "$(gh release view "$TAG" --json isPrerelease --jq '.isPrerelease')" = "false"
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fx "$ASSET"
           rm -rf /tmp/cast-release
           mkdir -p /tmp/cast-release
           gh release download "$TAG" -p "$ASSET" -D /tmp/cast-release --clobber
