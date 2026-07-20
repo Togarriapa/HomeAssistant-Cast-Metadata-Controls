@@ -1,5 +1,7 @@
 {
   "name": "Cast Metadata & TV Controls",
   "render_readme": true,
-  "homeassistant": "2025.12.0"
+  "homeassistant": "2025.12.0",
+  "zip_release": true,
+  "filename": "cast_attribute_sensors.zip"
 }

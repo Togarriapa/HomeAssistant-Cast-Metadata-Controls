@@ -9,12 +9,13 @@ _MANAGERS: dict[str, AdSkipManager] = {}
 
 def register_manager(entry_id: str, manager: AdSkipManager) -> None:
     """Register the manager belonging to one config entry."""
-    # This runs after the V8.1 startup patch and before controller platforms are
-    # forwarded, so the generic V8.3 capability layer is installed in the
-    # correct order without relying on integration-specific import timing.
+    # Install the runtime layers before controller platforms are forwarded. Keeping
+    # this idempotent hook preserves startup compatibility with the v8.3 release.
     from .v83_patch import install_v83_patches
+    from .v831_patch import install_v831_patches
 
     install_v83_patches()
+    install_v831_patches()
     _MANAGERS[entry_id] = manager
 
 
