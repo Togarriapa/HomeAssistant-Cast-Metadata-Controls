@@ -9,11 +9,24 @@ from typing import Any
 from homeassistant.const import STATE_UNAVAILABLE
 
 from .ad_skip import AdSkipManager
+from .const import DOMAIN, MEDIA_PLAYER_DOMAIN
 from .media_player import UnifiedMediaController
 from .source_manager import SourceManager
 
 _LOGGER = logging.getLogger(__name__)
 _INSTALLED = False
+
+
+def _classify(self: SourceManager, entry) -> tuple[bool, bool] | None:
+    """Track every external media player while preserving conservative auto grouping."""
+    classified = _classify.original(self, entry)
+    if classified is not None:
+        return classified
+    if entry.domain == MEDIA_PLAYER_DOMAIN and entry.platform != DOMAIN:
+        # A generic player is tracked so the user can explicitly assign it. Because
+        # both flags are false it never creates an automatic TV/Cast controller.
+        return False, False
+    return None
 
 
 def _configured_apps(self: SourceManager, source_id: str) -> dict[str, str]:
@@ -27,7 +40,9 @@ def _configured_apps(self: SourceManager, source_id: str) -> dict[str, str]:
         config_entry = self.hass.config_entries.async_get_entry(source.config_entry_id)
         if config_entry is not None:
             for container in (config_entry.data, config_entry.options):
-                raw_apps = container.get("apps", {}) if isinstance(container, Mapping) else {}
+                raw_apps = (
+                    container.get("apps", {}) if isinstance(container, Mapping) else {}
+                )
                 if isinstance(raw_apps, Mapping):
                     for app_id, app_data in raw_apps.items():
                         if isinstance(app_data, Mapping):
@@ -141,6 +156,9 @@ def install_v840_patches() -> None:
     if _INSTALLED:
         return
     _INSTALLED = True
+
+    _classify.original = SourceManager._classify
+    SourceManager._classify = _classify
 
     _configured_apps.original = SourceManager.tv_apps
     SourceManager.tv_apps = _configured_apps
