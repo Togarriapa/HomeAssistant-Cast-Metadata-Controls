@@ -1,5 +1,12 @@
 # Changelog
 
+## 8.3.2
+
+- Reissued the 8.3 runtime fixes as a clean semantic-version transition so HACS cannot remain pinned to the earlier release metadata.
+- Replaced the shell-managed release creation path with `softprops/action-gh-release`, which creates the GitHub release and attaches the exact validated HACS ZIP in one deterministic step.
+- Added post-publication verification that the release is non-draft, non-prerelease, marked latest, contains `cast_attribute_sensors.zip`, and downloads byte-for-byte identically to the generated package.
+- Kept all runtime behavior, config entries, entity IDs and dashboard references compatible with 8.3.1.
+
 ## 8.3.1
 
 - Installed the v8.3.1 correction layer before controller platforms are forwarded.
