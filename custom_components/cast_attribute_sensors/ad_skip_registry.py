@@ -18,6 +18,12 @@ def register_manager(entry_id: str, manager: AdSkipManager) -> None:
     install_v83_patches()
     install_v831_patches()
     install_v840_patches()
+
+    # V8.4 also tracks external media players that require explicit assignment. The
+    # initial source scan happened before the release patches were installed, so rescan
+    # and rebuild groups once before entities are forwarded to their platforms.
+    manager.runtime.manager._async_rescan_sources()  # noqa: SLF001
+    manager.runtime.refresh_groups()
     _MANAGERS[entry_id] = manager
 
 
