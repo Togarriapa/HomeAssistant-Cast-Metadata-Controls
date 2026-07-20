@@ -265,11 +265,14 @@
     "error": {
       "two_devices_required": "Select at least two different controller devices.",
       "two_entities_required": "Select at least two different native source entities.",
-      "media_player_required": "Select at least one supported media_player entity."
+      "media_player_required": "Select at least one supported media_player entity.",
+      "merge_failed": "The physical-device merge could not be saved. Check the Home Assistant logs.",
+      "inventory_save_failed": "The physical-device entity inventory could not be saved. Check the Home Assistant logs."
     },
     "abort": {
       "group_not_found": "The selected physical device is no longer available.",
-      "not_enough_devices": "Only one physical device is currently detected, so there is nothing to merge."
+      "not_enough_devices": "Only one physical device is currently detected, so there is nothing to merge.",
+      "not_enough_source_entities": "At least two external media_player entities are required for a merge."
     }
   },
   "issues": {
