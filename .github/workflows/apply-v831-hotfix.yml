@@ -1,0 +1,410 @@
+name: Apply v8.3.1 runtime and HACS hotfix
+
+on:
+  push:
+    branches:
+      - fix/v8.3.1-runtime-hacs-hotfix
+    paths:
+      - .github/workflows/apply-v831-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v8.3.1-runtime-hacs-hotfix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply hotfix
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import re
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text()
+              if old not in text:
+                  raise SystemExit(f'Missing marker in {path}: {old[:100]!r}')
+              target.write_text(text.replace(old, new, 1))
+
+          component = Path('custom_components/cast_attribute_sensors')
+
+          replace_once(
+              str(component / '__init__.py'),
+              'from .v81_patch import install_v81_patches\n',
+              'from .v81_patch import install_v81_patches\n'
+              'from .v83_patch import install_v83_patches\n'
+              'from .v831_patch import install_v831_patches\n',
+          )
+          replace_once(
+              str(component / '__init__.py'),
+              '# Activate the hardware-evidence, identity, and registry reconciliation layer.\n'
+              'install_v81_patches()\n',
+              '# Install runtime layers deterministically before any manager or platform setup.\n'
+              'install_v81_patches()\n'
+              'install_v83_patches()\n'
+              'install_v831_patches()\n',
+          )
+          replace_once(
+              str(component / 'ad_skip_registry.py'),
+              '    # This runs after the V8.1 startup patch and before controller platforms are\n'
+              '    # forwarded, so the generic V8.3 capability layer is installed in the\n'
+              '    # correct order without relying on integration-specific import timing.\n'
+              '    from .v83_patch import install_v83_patches\n\n'
+              '    install_v83_patches()\n'
+              '    _MANAGERS[entry_id] = manager\n',
+              '    _MANAGERS[entry_id] = manager\n',
+          )
+
+          init_path = component / '__init__.py'
+          init_text = init_path.read_text()
+          launch_pattern = re.compile(
+              r'    async def launch_tv_app\(call: ServiceCall\) -> None:\n.*?'
+              r'(?=    async def register_tv_app)',
+              re.S,
+          )
+          launch_replacement = '''    async def launch_tv_app(call: ServiceCall) -> None:
+              app_id = call.data[ATTR_APP_ID].strip()
+              for entity_id in _entity_ids(call):
+                  if entity_id in runtime.controllers:
+                      await _controller(runtime, entity_id).async_launch_tv_app(app_id)
+                      continue
+                  source_id = manager.source_id_for_entity(entity_id)
+                  if source_id is None:
+                      raise ServiceValidationError(
+                          f"{entity_id} is not a configured native application provider"
+                      )
+                  await manager.launch_tv_app(source_id, app_id)
+
+'''
+          init_text, count = launch_pattern.subn(launch_replacement, init_text, count=1)
+          if count != 1:
+              raise SystemExit('Could not replace launch_tv_app service handler')
+
+          register_pattern = re.compile(
+              r'    async def register_tv_app\(call: ServiceCall\) -> None:\n.*?'
+              r'(?=    async def send_command)',
+              re.S,
+          )
+          register_replacement = '''    async def register_tv_app(call: ServiceCall) -> None:
+              app_id = call.data[ATTR_APP_ID].strip()
+              app_name = call.data[ATTR_APP_NAME].strip()
+              for entity_id in _entity_ids(call):
+                  if entity_id in runtime.controllers:
+                      _controller(runtime, entity_id).register_tv_app(app_id, app_name)
+                      continue
+                  source_id = manager.source_id_for_entity(entity_id)
+                  if source_id is None:
+                      raise ServiceValidationError(
+                          f"{entity_id} is not a configured native application provider"
+                      )
+                  manager.register_app(source_id, app_id, app_name)
+
+'''
+          init_text, count = register_pattern.subn(register_replacement, init_text, count=1)
+          if count != 1:
+              raise SystemExit('Could not replace register_tv_app service handler')
+
+          replace = (
+              '            if not await ad_skip_manager.async_skip_now(controller.group):\n'
+              '                raise ServiceValidationError(\n'
+              '                    f"No positively detected skippable YouTube ad on {entity_id}"\n'
+              '                )\n'
+          )
+          replacement = (
+              '            if not await ad_skip_manager.async_skip_now(controller.group):\n'
+              '                result = ad_skip_manager.details(controller.group)["last_result"]\n'
+              '                raise ServiceValidationError(\n'
+              '                    f"YouTube ad skip was not executed on {entity_id}: {result}"\n'
+              '                )\n'
+          )
+          if replace not in init_text:
+              raise SystemExit('Could not replace skip_ad diagnostics')
+          init_path.write_text(init_text.replace(replace, replacement, 1))
+
+          replace_once(
+              str(component / 'ad_skip.py'),
+              '''    async def async_skip_now(self, group: PhysicalGroup) -> bool:
+                  """Try every safe method immediately, even when automation is off."""
+                  if await self._async_try_cast(group, ignore_cooldown=True):
+                      return True
+                  return await self._async_try_adb(group, ignore_cooldown=True)
+''',
+              '''    async def async_skip_now(self, group: PhysicalGroup) -> bool:
+                  """Try safe methods and expose a precise refusal reason."""
+                  youtube_sources = [
+                      source_id
+                      for source_id in group.source_ids
+                      if self._youtube_state(source_id) is not None
+                  ]
+                  if not youtube_sources:
+                      self._set_result(group.key, "youtube_not_detected")
+                      return False
+                  if await self._async_try_cast(group, ignore_cooldown=True):
+                      return True
+                  if await self._async_try_adb(group, ignore_cooldown=True):
+                      return True
+
+                  command_map = self.runtime.configured_command_map(group)
+                  if command_map.get("SKIP_AD"):
+                      try:
+                          await self.runtime.manager.send_command(
+                              group.source_ids, "SKIP_AD"
+                          )
+                      except Exception:  # noqa: BLE001
+                          self._set_result(group.key, "configured_skip_command_failed")
+                          return False
+                      self._mark_skipped(group.key, "sent_configured_skip_command")
+                      return True
+
+                  cast_sources = [
+                      source_id
+                      for source_id in youtube_sources
+                      if (
+                          (source := self.runtime.manager.get_source(source_id))
+                          is not None
+                          and source.is_cast
+                      )
+                  ]
+                  adb_sources = [
+                      source_id
+                      for source_id in youtube_sources
+                      if (
+                          (source := self.runtime.manager.get_source(source_id))
+                          is not None
+                          and source.platform == ANDROID_TV_ADB_DOMAIN
+                      )
+                  ]
+                  if adb_sources and not self.hass.services.has_service(
+                      ANDROID_TV_ADB_DOMAIN, "adb_command"
+                  ):
+                      result = "adb_service_unavailable"
+                  elif adb_sources:
+                      result = "skip_control_not_detected"
+                  elif cast_sources:
+                      result = "cast_skip_not_advertised"
+                  else:
+                      result = "no_safe_skip_method"
+                  self._set_result(group.key, result)
+                  return False
+''',
+          )
+
+          generic_path = component / 'generic_capabilities.py'
+          generic = generic_path.read_text()
+          generic = generic.replace(
+              '    "DPAD_CENTER",\n)',
+              '    "DPAD_CENTER",\n    "SKIP_AD",\n)',
+              1,
+          )
+          generic = generic.replace(
+              '    "DPAD_CENTER": "OK / Select",\n}',
+              '    "DPAD_CENTER": "OK / Select",\n    "SKIP_AD": "Skip advertisement",\n}',
+              1,
+          )
+          generic_path.write_text(generic)
+
+          const_path = component / 'const.py'
+          const_path.write_text(const_path.read_text().replace(
+              'VERSION: Final = "8.3.0"', 'VERSION: Final = "8.3.1"', 1
+          ))
+          manifest_path = component / 'manifest.json'
+          manifest = json.loads(manifest_path.read_text())
+          manifest['version'] = '8.3.1'
+          manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+
+          hacs_path = Path('hacs.json')
+          hacs = json.loads(hacs_path.read_text())
+          hacs['zip_release'] = True
+          hacs['filename'] = 'cast_attribute_sensors.zip'
+          hacs_path.write_text(json.dumps(hacs, indent=2) + '\n')
+
+          for translation_path in (
+              component / 'strings.json',
+              component / 'translations' / 'en.json',
+              component / 'translations' / 'pt.json',
+          ):
+              data = json.loads(translation_path.read_text())
+              remote = data['options']['step']['remote_commands_group']['data']
+              remote['SKIP_AD'] = (
+                  'Comando para ignorar anúncio'
+                  if translation_path.name == 'pt.json'
+                  else 'Skip advertisement command'
+              )
+              translation_path.write_text(
+                  json.dumps(data, ensure_ascii=False, indent=2) + '\n'
+              )
+
+          changelog_path = Path('CHANGELOG.md')
+          changelog = changelog_path.read_text()
+          entry = '''## 8.3.1
+
+          - Made v8.3 and v8.3.1 runtime activation explicit and deterministic before integration setup.
+          - Routed application discovery, registration and launch through the configured physical-device providers instead of the legacy Android-TV-only service path.
+          - Added learned/current generic native applications while filtering providers that cannot launch them.
+          - Restored safe automatic navigation and restart provider fallback when the explicit entity inventory is incomplete.
+          - Added precise YouTube ad-skip refusal diagnostics and an optional explicitly configured `SKIP_AD` remote command for manual use.
+          - Published a deterministic HACS ZIP containing the exact validated integration payload.
+          - Preserved the v7 entity namespace, existing controller entity IDs and configuration data.
+
+          '''.replace('          ', '')
+          if '## 8.3.1\n' not in changelog:
+              changelog_path.write_text(
+                  changelog.replace('# Changelog\n\n', '# Changelog\n\n' + entry, 1)
+              )
+
+          readme_path = Path('README.md')
+          readme = readme_path.read_text()
+          readme = readme.replace('8.3.0', '8.3.1')
+          readme_path.write_text(readme)
+
+          test_path = Path('tests/test_v83_activation.py')
+          test = test_path.read_text()
+          test = test.replace(
+              'registry = (COMPONENT / "ad_skip_registry.py").read_text()\n'
+              '        setup = (COMPONENT / "__init__.py").read_text()\n'
+              '        self.assertIn("install_v83_patches()", registry)\n',
+              'setup = (COMPONENT / "__init__.py").read_text()\n'
+              '        self.assertIn("install_v83_patches()", setup)\n'
+              '        self.assertIn("install_v831_patches()", setup)\n',
+              1,
+          )
+          test = test.replace('"8.3.0"', '"8.3.1"')
+          test_path.write_text(test)
+
+          Path('.github/workflows/release.yml').write_text('''name: Publish release
+
+          on:
+            push:
+              branches: [main]
+              paths:
+                - custom_components/cast_attribute_sensors/**
+                - hacs.json
+                - CHANGELOG.md
+                - .github/workflows/release.yml
+            schedule:
+              - cron: "23 3 * * *"
+            workflow_dispatch:
+
+          concurrency:
+            group: publish-cast-metadata-release
+            cancel-in-progress: false
+
+          permissions:
+            contents: write
+
+          jobs:
+            release:
+              runs-on: ubuntu-latest
+              timeout-minutes: 10
+              steps:
+                - uses: actions/checkout@v4
+                  with:
+                    fetch-depth: 0
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: "3.13"
+                - name: Verify version consistency and build HACS asset
+                  id: version
+                  run: |
+                    python - <<'PY2' >> "$GITHUB_OUTPUT"
+                    import ast
+                    import json
+                    import re
+                    import zipfile
+                    from pathlib import Path
+
+                    component = Path('custom_components/cast_attribute_sensors')
+                    manifest = json.loads((component / 'manifest.json').read_text())
+                    module = ast.parse((component / 'const.py').read_text())
+                    const_version = next(
+                        node.value.value
+                        for node in module.body
+                        if isinstance(node, ast.AnnAssign)
+                        and getattr(node.target, 'id', None) == 'VERSION'
+                        and isinstance(node.value, ast.Constant)
+                    )
+                    heading = re.search(
+                        r'^## ([0-9]+\.[0-9]+\.[0-9]+)$',
+                        Path('CHANGELOG.md').read_text(),
+                        re.M,
+                    )
+                    hacs = json.loads(Path('hacs.json').read_text())
+                    versions = {manifest['version'], const_version, heading.group(1)}
+                    if len(versions) != 1:
+                        raise SystemExit(f'Version mismatch: {sorted(versions)}')
+                    if not hacs.get('zip_release') or hacs.get('filename') != 'cast_attribute_sensors.zip':
+                        raise SystemExit('hacs.json release asset metadata is invalid')
+                    asset = Path(hacs['filename'])
+                    with zipfile.ZipFile(asset, 'w', zipfile.ZIP_DEFLATED) as archive:
+                        for path in sorted(component.rglob('*')):
+                            if path.is_file() and '__pycache__' not in path.parts:
+                                archive.write(path, path.relative_to(component))
+                    with zipfile.ZipFile(asset) as archive:
+                        names = set(archive.namelist())
+                    if 'manifest.json' not in names or '__init__.py' not in names:
+                        raise SystemExit('Release ZIP does not contain the component at its root')
+                    version = manifest['version']
+                    print(f'version={version}')
+                    print(f'tag=v{version}')
+                    print(f'asset={asset}')
+                    PY2
+                - name: Publish or repair GitHub release
+                  env:
+                    GH_TOKEN: ${{ github.token }}
+                    TAG: ${{ steps.version.outputs.tag }}
+                    VERSION: ${{ steps.version.outputs.version }}
+                    ASSET: ${{ steps.version.outputs.asset }}
+                  run: |
+                    set -euo pipefail
+                    git config user.name "github-actions[bot]"
+                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                    if ! git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+                      git tag -a "$TAG" -m "Cast Metadata & TV Controls $VERSION"
+                      git push origin "$TAG"
+                    fi
+                    awk -v version="$VERSION" '
+                      $0 == "## " version {flag=1; next}
+                      /^## / && flag {exit}
+                      flag
+                    ' CHANGELOG.md > release-notes.md
+                    if [[ ! -s release-notes.md ]]; then
+                      printf 'Cast Metadata & TV Controls %s\n' "$VERSION" > release-notes.md
+                    fi
+                    if gh release view "$TAG" >/dev/null 2>&1; then
+                      gh release edit "$TAG" --draft=false --prerelease=false --latest \
+                        --title "Cast Metadata & TV Controls $VERSION"
+                      gh release upload "$TAG" "$ASSET" --clobber
+                    else
+                      gh release create "$TAG" "$ASSET" \
+                        --target "$GITHUB_SHA" \
+                        --title "Cast Metadata & TV Controls $VERSION" \
+                        --notes-file release-notes.md \
+                        --verify-tag \
+                        --latest
+                    fi
+                    test "$(gh release view "$TAG" --json assets --jq '.assets[] | select(.name == env.ASSET) | .name')" = "$ASSET"
+                    rm -rf /tmp/cast-release && mkdir -p /tmp/cast-release
+                    gh release download "$TAG" -p "$ASSET" -D /tmp/cast-release --clobber
+                    cmp "$ASSET" "/tmp/cast-release/$ASSET"
+          '''.replace('          ', ''))
+
+          Path('.github/workflows/apply-v831-hotfix.yml').unlink()
+          PY
+      - name: Commit hotfix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release v8.3.1 runtime and HACS hotfix'
+          git push origin HEAD:fix/v8.3.1-runtime-hacs-hotfix
