@@ -9,7 +9,9 @@ from homeassistant.components.media_player import MediaPlayerEntityFeature
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.exceptions import HomeAssistantError
 
+from .ad_skip import AdSkipManager
 from .const import (
+    ANDROID_TV_ADB_DOMAIN,
     ANDROID_TV_REMOTE_DOMAIN,
     BUTTON_DOMAIN,
     DOMAIN,
@@ -116,6 +118,40 @@ def _provider_entity_id(
     return scored[0][1] if len(scored) == 1 else None
 
 
+def _native_app_source_id(
+    self: SourceManager, source_ids: tuple[str, ...]
+) -> str | None:
+    """Return the best non-Cast provider for application operations."""
+    legacy = _native_app_source_id.original(self, source_ids)
+    if legacy is not None:
+        return legacy
+
+    candidates: list[tuple[int, str]] = []
+    for source_id in source_ids:
+        source = self.get_source(source_id)
+        if source is None or source.is_cast or source.entity_id is None:
+            continue
+        score = 0
+        if source.platform == ANDROID_TV_REMOTE_DOMAIN:
+            score += 500
+        selectable = self.sources(source_id)
+        if selectable:
+            score += 250
+        if self.supports(source_id, MediaPlayerEntityFeature.PLAY_MEDIA):
+            score += 200
+        state = self.get_state(source_id)
+        if state is not None and state.state != STATE_UNAVAILABLE:
+            score += 50
+            if state.attributes.get("app_id") or state.attributes.get("app_name"):
+                score += 20
+        candidates.append((score, source_id))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return candidates[0][1]
+
+
 def _tv_apps(self: SourceManager, source_id: str) -> dict[str, str]:
     """Expose learned/current apps for every configured non-Cast provider."""
     source = self.get_source(source_id)
@@ -187,9 +223,22 @@ async def _launch_tv_app(
 
 
 def _raw_actions(self: UnifiedMediaController) -> list[SourceAction]:
-    """Add learned/current generic apps without duplicating selectable apps."""
+    """Add launchable learned/current apps without duplicating selectable apps."""
     actions = list(_raw_actions.original(self))
     for source_id in self._source_ids(cast=False):
+        source = self.runtime.manager.get_source(source_id)
+        if source is None:
+            continue
+        selectable = {
+            value.casefold().strip()
+            for value in self.runtime.manager.sources(source_id)
+        }
+        can_launch = (
+            source.platform == ANDROID_TV_REMOTE_DOMAIN
+            or self.runtime.manager.supports(
+                source_id, MediaPlayerEntityFeature.PLAY_MEDIA
+            )
+        )
         existing_values = {
             action.value.casefold()
             for action in actions
@@ -203,12 +252,16 @@ def _raw_actions(self: UnifiedMediaController) -> list[SourceAction]:
         for app_id, name in self.runtime.manager.tv_apps(source_id).items():
             normalized_id = app_id.casefold().strip()
             normalized_name = name.casefold().strip()
+            selectable_match = (
+                normalized_id in selectable or normalized_name in selectable
+            )
             if (
                 not normalized_id
                 or not normalized_name
                 or _is_transient_app(name)
                 or normalized_id in existing_values
                 or normalized_name in existing_names
+                or (not selectable_match and not can_launch)
             ):
                 continue
             actions.append(
@@ -286,19 +339,8 @@ async def _async_launch_tv_app(
             await self.async_select_source(option)
             return
 
-    candidates = list(self._category_ids(ROUTE_TV_APPS, cast=False))
-    candidates.extend(
-        source_id
-        for source_id in self._source_ids(cast=False)
-        if source_id not in candidates
-    )
-    target = next(
-        (
-            source_id
-            for source_id in candidates
-            if self.runtime.manager.available(source_id)
-        ),
-        candidates[0] if candidates else None,
+    target = self.runtime.manager.android_tv_remote_source_id(
+        self.group.source_ids
     )
     if target is None:
         raise HomeAssistantError("No native application provider is configured")
@@ -310,19 +352,8 @@ def _register_tv_app(
     self: UnifiedMediaController, app_id: str, app_name: str
 ) -> None:
     """Register an app against the best native provider for this device."""
-    candidates = list(self._category_ids(ROUTE_TV_APPS, cast=False))
-    candidates.extend(
-        source_id
-        for source_id in self._source_ids(cast=False)
-        if source_id not in candidates
-    )
-    target = next(
-        (
-            source_id
-            for source_id in candidates
-            if self.runtime.manager.available(source_id)
-        ),
-        candidates[0] if candidates else None,
+    target = self.runtime.manager.android_tv_remote_source_id(
+        self.group.source_ids
     )
     if target is None:
         raise HomeAssistantError("No native application provider is configured")
@@ -350,6 +381,51 @@ def _extra_state_attributes(self: UnifiedMediaController) -> dict[str, Any]:
     return attributes
 
 
+async def _async_skip_now(
+    self: AdSkipManager, group
+) -> bool:
+    """Keep conservative skipping but record an actionable failure reason."""
+    youtube_sources = [
+        source_id
+        for source_id in group.source_ids
+        if self._youtube_state(source_id) is not None
+    ]
+    if not youtube_sources:
+        self._set_result(group.key, "youtube_not_detected")
+        return False
+    if await _async_skip_now.original(self, group):
+        return True
+
+    cast_sources = [
+        source_id
+        for source_id in youtube_sources
+        if (
+            (source := self.runtime.manager.get_source(source_id)) is not None
+            and source.is_cast
+        )
+    ]
+    adb_sources = [
+        source_id
+        for source_id in youtube_sources
+        if (
+            (source := self.runtime.manager.get_source(source_id)) is not None
+            and source.platform == ANDROID_TV_ADB_DOMAIN
+        )
+    ]
+    if adb_sources and not self.hass.services.has_service(
+        ANDROID_TV_ADB_DOMAIN, "adb_command"
+    ):
+        result = "adb_service_unavailable"
+    elif adb_sources:
+        result = "skip_control_not_detected"
+    elif cast_sources:
+        result = "cast_skip_not_advertised"
+    else:
+        result = "no_safe_skip_method"
+    self._set_result(group.key, result)
+    return False
+
+
 def install_v831_patches() -> None:
     """Install the v8.3.1 corrections exactly once after v8.3."""
     global _INSTALLED
@@ -359,6 +435,8 @@ def install_v831_patches() -> None:
 
     _provider_entity_id.original = SourceManager.provider_entity_id
     SourceManager.provider_entity_id = _provider_entity_id
+    _native_app_source_id.original = SourceManager.android_tv_remote_source_id
+    SourceManager.android_tv_remote_source_id = _native_app_source_id
     _tv_apps.original = SourceManager.tv_apps
     SourceManager.tv_apps = _tv_apps
     _launch_tv_app.original = SourceManager.launch_tv_app
@@ -376,3 +454,6 @@ def install_v831_patches() -> None:
     UnifiedMediaController.register_tv_app = _register_tv_app
     _extra_state_attributes.original = UnifiedMediaController.extra_state_attributes
     UnifiedMediaController.extra_state_attributes = property(_extra_state_attributes)
+
+    _async_skip_now.original = AdSkipManager.async_skip_now
+    AdSkipManager.async_skip_now = _async_skip_now
