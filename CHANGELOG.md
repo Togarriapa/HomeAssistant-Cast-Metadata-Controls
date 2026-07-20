@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.4.0
+
+- Replaced the fragile advanced merge selector with an external-entity-only physical-device setup that never offers the integration-owned Controller entity.
+- Saved options before scheduling the integration reload, preventing reload failures from becoming an opaque `Unknown error occurred` form response.
+- Began tracking every external media player for explicit assignment while keeping automatic TV/Cast grouping conservative.
+- Made the configured physical-device inventory authoritative for native media players, remotes, restart buttons, provider routing, and remote commands.
+- Collected native applications from linked source lists, active app metadata, learned apps, and provider configuration without manufacturer-specific profiles.
+- Kept automatic YouTube ad skipping positive-detection-only while giving the explicit manual action a separately reported remote-confirm attempt.
+- Added controller diagnostics for runtime version, native source entities, native application count, and manual ad-skip availability.
+- Preserved existing config entries, entity IDs, dashboard YAML, activities, routes, preferences, and Wake-on-LAN settings.
+
 ## 8.3.2
 
 - Reissued the 8.3 runtime fixes as a clean semantic-version transition so HACS cannot remain pinned to the earlier release metadata.

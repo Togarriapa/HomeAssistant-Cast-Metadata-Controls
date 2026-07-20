@@ -16,6 +16,7 @@ class V83ActivationTests(unittest.TestCase):
         setup = (COMPONENT / "__init__.py").read_text()
         self.assertIn("install_v83_patches()", registry)
         self.assertIn("install_v831_patches()", registry)
+        self.assertIn("install_v840_patches()", registry)
         self.assertLess(
             setup.index("register_manager(entry.entry_id"),
             setup.index("async_forward_entry_setups"),
@@ -24,14 +25,15 @@ class V83ActivationTests(unittest.TestCase):
     def test_options_patch_is_activated(self) -> None:
         source = (COMPONENT / "config_flow.py").read_text()
         self.assertIn("install_v83_options(ControllerOptionsFlow)", source)
+        self.assertIn("install_v840_options(ControllerOptionsFlow)", source)
 
     def test_release_versions_match(self) -> None:
         manifest = json.loads((COMPONENT / "manifest.json").read_text())
         const = (COMPONENT / "const.py").read_text()
         changelog = (ROOT / "CHANGELOG.md").read_text()
-        self.assertEqual(manifest["version"], "8.3.2")
-        self.assertIn('VERSION: Final = "8.3.2"', const)
-        self.assertIn("## 8.3.2", changelog)
+        self.assertEqual(manifest["version"], "8.4.0")
+        self.assertIn('VERSION: Final = "8.4.0"', const)
+        self.assertIn("## 8.4.0", changelog)
 
     def test_hacs_uses_verified_zip_release(self) -> None:
         hacs = json.loads((ROOT / "hacs.json").read_text())

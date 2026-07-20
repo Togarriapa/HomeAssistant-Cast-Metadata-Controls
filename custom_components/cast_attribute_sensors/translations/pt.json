@@ -265,11 +265,14 @@
     "error": {
       "two_devices_required": "Selecione pelo menos dois dispositivos controladores diferentes.",
       "two_entities_required": "Selecione pelo menos duas entidades de origem nativas diferentes.",
-      "media_player_required": "Selecione pelo menos uma entidade media_player suportada."
+      "media_player_required": "Selecione pelo menos uma entidade media_player suportada.",
+      "merge_failed": "Não foi possível guardar a união dos dispositivos. Consulte os registos do Home Assistant.",
+      "inventory_save_failed": "Não foi possível guardar as entidades do dispositivo. Consulte os registos do Home Assistant."
     },
     "abort": {
       "group_not_found": "O dispositivo físico selecionado já não está disponível.",
-      "not_enough_devices": "Só foi detetado um dispositivo físico, por isso não existe nada para unir."
+      "not_enough_devices": "Só foi detetado um dispositivo físico, por isso não existe nada para unir.",
+      "not_enough_source_entities": "Não existem pelo menos duas entidades media_player externas disponíveis para unir."
     }
   },
   "issues": {
