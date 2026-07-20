@@ -1,5 +1,15 @@
 # Changelog
 
+## 8.3.1
+
+- Installed the v8.3.1 correction layer before controller platforms are forwarded.
+- Routed existing application services through the best configured non-Cast application provider instead of requiring an Android TV Remote source.
+- Added launchable learned and currently active applications from generic native providers without duplicating selectable sources.
+- Restored safe navigation and restart provider fallback when the explicit entity inventory is incomplete.
+- Added precise YouTube ad-skip failure states such as `youtube_not_detected`, `cast_skip_not_advertised`, `adb_service_unavailable`, and `skip_control_not_detected`.
+- Published a deterministic HACS ZIP containing the exact validated integration payload and verified the uploaded asset byte-for-byte.
+- Preserved the v7 entity namespace, existing controller entity IDs, config entry and dashboard references.
+
 ## 8.3.0
 
 - Replaced the vendor-specific remote assumption with an explicit physical-device entity inventory.
