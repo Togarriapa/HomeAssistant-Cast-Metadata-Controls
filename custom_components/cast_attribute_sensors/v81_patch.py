@@ -94,7 +94,7 @@ def _snapshots(self: SourceManager) -> tuple[SourceSnapshot, ...]:
                 is_tv=source.is_tv,
                 manufacturer=device.manufacturer if device else None,
                 model=device.model if device else None,
-                device_name=device.name if device else None,
+                device_name=(device.name_by_user or device.name) if device else None,
             )
         )
     return tuple(snapshots)
