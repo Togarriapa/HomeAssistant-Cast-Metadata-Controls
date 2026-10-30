@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -24,6 +25,8 @@ from .const import (
     STORAGE_VERSION,
 )
 from .grouping import PhysicalGroup
+
+_LOGGER = logging.getLogger(__name__)
 
 _CAST_SKIP_COMMAND = 512
 _CAST_COOLDOWN = 4.0
@@ -199,9 +202,14 @@ class AdSkipManager:
                     continue
                 self._last_adb_poll[group.key] = now
                 try:
-                    await self._async_try_adb(group)
+                    # Cast also polls: a SKIP_AD capability change does not change HA state.
+                    if not await self._async_try_cast(group):
+                        await self._async_try_adb(group)
                 except Exception:  # noqa: BLE001
                     # Detection is optional and must never destabilize media control.
+                    _LOGGER.warning(
+                        "Ad detection failed for %s", group.key, exc_info=True
+                    )
                     self._set_result(group.key, "detection_error")
             await asyncio.sleep(0.5)
 
@@ -308,7 +316,10 @@ class AdSkipManager:
             if current is None or not is_youtube_attributes(current.attributes):
                 return False
             response = current.attributes.get("adb_response")
-            if not isinstance(response, str):
+            if not isinstance(response, str) or not response:
+                self._warn_once(
+                    group.key, "adb_no_response", f"{entity_id} returned no UI dump"
+                )
                 return False
             target = find_skip_target(response)
             if target is None:
@@ -331,6 +342,12 @@ class AdSkipManager:
             self._mark_skipped(group.key, "skipped_android_tv")
             return True
         return False
+
+    def _warn_once(self, group_key: str, result: str, message: str) -> None:
+        """Log a failure only when it changes, since the loop polls every 1.5s."""
+        if self._last_result.get(group_key) != result:
+            _LOGGER.warning("Ad skip for %s: %s", group_key, message)
+        self._set_result(group_key, result)
 
     def _mark_skipped(self, group_key: str, result: str) -> None:
         self._last_skip_at[group_key] = dt_util.utcnow()
